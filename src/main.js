@@ -22,6 +22,7 @@ import { ProfilerInstrumenter } from './Engine/Profiling/Profiler.js';
 import { Editor } from './Editor/Editor.js';
 import { FirstPersonController } from './FirstPersonController.js';
 import { FirstPersonHand } from './FirstPersonHand.js';
+import { PlayerInventory } from './PlayerInventory.js';
 import { FloatingObjectSpawner } from './FloatingObjectSpawner.js';
 
 
@@ -703,10 +704,18 @@ const cameraController = new FirstPersonController(camera, canvas, {
 game.cameraController = cameraController;
 const firstPersonHand = new FirstPersonHand(gl, renderer, shaderMain, camera, scene, {
     controller: cameraController,
-    inputElement: canvas
+    inputElement: canvas,
+    onEatFood: (healAmount) => game.healPlayer(healAmount)
 });
 game.firstPersonHand = firstPersonHand;
 game.attack = () => firstPersonHand.attack();
+const playerInventory = new PlayerInventory(gl, renderer, shaderMain, camera, scene, {
+    hand: firstPersonHand,
+    controller: cameraController
+});
+firstPersonHand.inventory = playerInventory;
+game.inventory = playerInventory;
+game.player.inventory = playerInventory;
 
 // #endregion
 
@@ -766,6 +775,7 @@ function loop(now) {
 
     cameraController.update(Time.deltaTime);
     firstPersonHand.update(Time.deltaTime);
+    playerInventory.update(Time.deltaTime);
 
     
     // Update material uniforms with time

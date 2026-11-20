@@ -6,7 +6,7 @@ import { Texture } from './Engine/Rendering/Texture.js';
 /** Loads and attaches the textured first-person hand to the camera. */
 export class FirstPersonHand {
     constructor(gl, renderer, shader, camera, scene, options = {}) {
-        const { controller = null, inputElement = null, ...settings } = options;
+        const { controller = null, inputElement = null, onEatFood = null, ...settings } = options;
         this.settings = {
             modelPath: './Assets/Characters/hand.obj',
             texturePath: './Assets/Characters/colormap.png',
@@ -29,24 +29,43 @@ export class FirstPersonHand {
             attackDiagonalDrop: 0.14,
             attackDiagonalRoll: 0.55,
             attackDiagonalPitch: 0.3,
+            eatDuration: 1.6,
             ...settings
         };
         this.camera = camera;
         this.scene = scene;
         this.controller = controller;
+        this.onEatFood = onEatFood;
+        this.inventory = null;
         this.inputElement = inputElement;
         this.bobBlend = 0;
         this.attackElapsed = null;
         this.attackCooldownRemaining = 0;
         this.attackHitApplied = false;
+        this.eatElapsed = null;
         this.weapon = null;
 
         this._onMouseDown = (event) => {
+            if (event.button === 2) {
+                if (this.inventory?.selectedId === 'food' && this.eatElapsed !== null) {
+                    event.preventDefault();
+                    this.cancelEating();
+                }
+                return;
+            }
             if (event.button !== 0) return;
             event.preventDefault();
             this.attack();
         };
+        this._onMouseUp = (event) => {
+            if (event.button === 2 && this.eatElapsed !== null) this.cancelEating();
+        };
         this.inputElement?.addEventListener('mousedown', this._onMouseDown);
+        window.addEventListener('mouseup', this._onMouseUp);
+        this._onContextMenu = (event) => {
+            if (this.eatElapsed !== null) event.preventDefault();
+        };
+        this.inputElement?.addEventListener('contextmenu', this._onContextMenu);
         this.ready = this._load(gl, renderer, shader);
     }
 
@@ -87,6 +106,7 @@ export class FirstPersonHand {
             this.bobBlend += (target - this.bobBlend) * blend;
         }
         let attackPulse = 0;
+        let eatPulse = 0;
         if (this.attackCooldownRemaining > 0) {
             this.attackCooldownRemaining = Math.max(0, this.attackCooldownRemaining - frameTime);
         }
@@ -101,21 +121,54 @@ export class FirstPersonHand {
             if (progress >= 1) this.attackElapsed = null;
         }
 
+        if (this.eatElapsed !== null) {
+            this.eatElapsed += frameTime;
+            const progress = Math.min(this.eatElapsed / this.settings.eatDuration, 1);
+            // Several quick bites, followed by a brief settle at the end.
+            eatPulse = progress < 0.88
+                ? Math.pow(Math.max(0, Math.sin(progress * Math.PI * 6)), 1.5)
+                : 1 - (progress - 0.88) / 0.12;
+            if (progress >= 1) {
+                this.eatElapsed = null;
+                if (this.inventory?.finishEating()) this.onEatFood?.(10);
+            }
+        }
+
         const phase = this.controller?.bobTime || 0;
         handTransform.position.set(
-            this.settings.position[0] + Math.cos(phase * 0.5) * this.settings.bobSideAmount * this.bobBlend - (this.settings.attackCenterShift + this.settings.attackSideSwing) * attackPulse,
-            this.settings.position[1] + Math.abs(Math.sin(phase)) * this.settings.bobAmount * this.bobBlend + (this.settings.attackLift - this.settings.attackDiagonalDrop) * attackPulse,
-            this.settings.position[2] - this.settings.attackThrust * attackPulse
+            this.settings.position[0] + Math.cos(phase * 0.5) * this.settings.bobSideAmount * this.bobBlend - (this.settings.attackCenterShift + this.settings.attackSideSwing) * attackPulse + 0.18 * eatPulse,
+            this.settings.position[1] + Math.abs(Math.sin(phase)) * this.settings.bobAmount * this.bobBlend + (this.settings.attackLift - this.settings.attackDiagonalDrop) * attackPulse + 0.2 * eatPulse,
+            this.settings.position[2] - this.settings.attackThrust * attackPulse + 0.16 * eatPulse
         );
         handTransform.rotation.set(
-            this.settings.rotation[0] - 0.28 * attackPulse,
+            this.settings.rotation[0] - 0.28 * attackPulse - 0.35 * eatPulse,
             this.settings.rotation[1],
-            this.settings.rotation[2] + this.settings.attackDiagonalRoll * attackPulse
+            this.settings.rotation[2] + this.settings.attackDiagonalRoll * attackPulse - 0.18 * eatPulse
         );
+    }
+
+    cancelEating() {
+        if (this.eatElapsed === null) return false;
+        this.eatElapsed = null;
+        this.inventory?.cancelEating();
+        return true;
     }
 
     /** Start a hand punch, or delegate to an equipped weapon's attack(context). */
     attack() {
+        if (this.inventory?.selectedId === 'sword') {
+            return this.inventory.attackSelected(() => this._attackDamage());
+        }
+        const selected = this.inventory?.selectedItem;
+        if (selected?.id === 'food' && selected.count > 0) {
+            if (this.eatElapsed !== null || this.attackElapsed !== null || this.attackCooldownRemaining > 0) return false;
+            this.eatElapsed = 0;
+            if (!this.inventory.startEating()) {
+                this.eatElapsed = null;
+                return false;
+            }
+            return true;
+        }
         if (this.weapon) {
             return this.weapon.attack(this._createWeaponContext());
         }
@@ -217,5 +270,7 @@ export class FirstPersonHand {
 
     dispose() {
         this.inputElement?.removeEventListener('mousedown', this._onMouseDown);
+        this.inputElement?.removeEventListener('contextmenu', this._onContextMenu);
+        window.removeEventListener('mouseup', this._onMouseUp);
     }
 }
