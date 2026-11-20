@@ -1,30 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PiGL.js</title>
     <link rel="stylesheet" href="/src/style.css">
 </head>
+
 <body>
     <canvas id="glcanvas"></canvas>
-    <div id="player-health" role="group" aria-label="Player health">
-        <div class="health-heading"><span class="health-heart" aria-hidden="true">&#9829;</span><span>HEALTH</span></div>
-        <div class="health-track" role="progressbar" aria-label="Player health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
-            <div id="health-fill" class="health-fill"></div>
-            <span id="health-value" class="health-value">100 / 100</span>
-        </div>
-    </div>
-    <div id="inventory-hud" aria-label="Player inventory">
-        <div id="inventory-selected" class="inventory-selected">EMPTY HAND</div>
-        <div class="inventory-slots">
-            <div id="inventory-sword" class="inventory-slot is-empty"><span class="inventory-key">1</span><span class="inventory-name">SWORD</span><span class="inventory-count">EMPTY</span></div>
-            <div id="inventory-food" class="inventory-slot is-empty"><span class="inventory-key">2</span><span class="inventory-name">FOOD</span><span class="inventory-count">EMPTY</span></div>
-        </div>
-    </div>
     <script type="module" src="/src/main.js"></script>
     <div id="hud">FPS: --<br>Δ: -- ms</div>
     <div id="wip">Working in Progress</div>
 
+    <!-- Health Bar HUD -->
+    <div id="health-bar-root">
+        <div id="health-bar-icon">❤</div>
+        <div id="health-bar-track">
+            <div id="health-bar-fill"></div>
+            <div id="health-bar-segments"></div>
+        </div>
+        <span id="health-bar-label">100 / 100</span>
+    </div>
+
+    <!-- Full-screen damage flash overlay -->
+    <div id="damage-flash"></div>
+
 </body>
+
 </html>

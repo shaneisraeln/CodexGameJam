@@ -12,10 +12,10 @@ canvas {
 
 #hud {
     position: fixed;
-    top: 78px;
+    top: 8px;
     left: 8px;
     padding: 6px 10px;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.5);
     color: #fff;
     font-family: monospace;
     font-size: 13px;
@@ -28,9 +28,9 @@ canvas {
 #wip {
     position: fixed;
     top: 8px;
-    left: 270px;
+    left: 120px;
     padding: 6px 10px;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.5);
     color: #fff;
     font-family: monospace;
     font-size: 13px;
@@ -40,145 +40,192 @@ canvas {
     pointer-events: none;
 }
 
-#player-health {
-    position: fixed;
-    top: 12px;
-    left: 12px;
-    width: 210px;
-    padding: 9px 11px 11px;
-    color: #fff8d8;
-    background: #34264f;
-    border: 3px solid #171329;
-    border-radius: 13px;
-    box-shadow: 0 4px 0 #171329, inset 0 2px 0 rgba(255, 255, 255, 0.18);
-    font-family: system-ui, sans-serif;
-    font-size: 13px;
-    font-weight: 900;
-    letter-spacing: 0.08em;
-    text-shadow: 1px 2px 0 #171329;
-    z-index: 9999;
-    pointer-events: none;
-}
+/* ── Health Bar ─────────────────────────────────────────────────────────── */
 
-.health-heading {
+#health-bar-root {
+    position: fixed;
+    top: 14px;
+    right: 14px;
     display: flex;
     align-items: center;
     gap: 7px;
-    margin-bottom: 6px;
-}
+    z-index: 9999;
+    pointer-events: none;
 
-.health-heart {
-    color: #ff6574;
-    font-size: 18px;
-    line-height: 1;
-    text-shadow: 1px 2px 0 #a52f50;
-}
-
-.health-track {
-    position: relative;
-    height: 19px;
-    overflow: hidden;
-    background: #211a35;
-    border: 2px solid #171329;
-    border-radius: 7px;
-    box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.4);
-}
-
-.health-fill {
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(180deg, #9bed72 0%, #55c968 55%, #329c5d 100%);
+    /* Pixel-art panel: dark navy with a warm orange border — matches the
+       skybox uTopColor (#222240) and the sunset accent palette */
+    background: rgba(10, 10, 22, 0.72);
+    border: 2px solid rgba(230, 120, 60, 0.55);
     border-radius: 4px;
-    transition: width 180ms ease, background 180ms ease;
+    padding: 5px 10px 5px 8px;
+
+    /* Subtle inner glow so it reads against any sky colour */
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 180, 80, 0.08);
+
+    /* Soft entrance */
+    animation: hb-fadein 0.6s ease both;
 }
 
-.health-fill.is-warning {
-    background: linear-gradient(180deg, #ffe875 0%, #ffb83f 55%, #e88231 100%);
+/* Heart icon */
+#health-bar-icon {
+    font-size: 15px;
+    line-height: 1;
+    color: #d94040;
+    text-shadow: 0 0 6px rgba(217, 64, 64, 0.8);
+    /* Gentle beat — slows down when health is fine */
+    animation: hb-beat 1.4s ease-in-out infinite;
+    flex-shrink: 0;
 }
 
-.health-fill.is-critical {
-    background: linear-gradient(180deg, #ff8590 0%, #f04461 55%, #bf254c 100%);
+/* Outer track */
+#health-bar-track {
+    position: relative;
+    width: 140px;
+    height: 12px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 2px;
+    overflow: hidden;
+    image-rendering: pixelated;
 }
 
-.health-value {
+/* Animated fill — colour is set dynamically by PlayerHealth.js */
+#health-bar-fill {
+    height: 100%;
+    width: 100%;
+    /* overwritten by JS */
+    background: #7ecf6e;
+    /* default green; JS overrides */
+    border-radius: 1px;
+    transition: width 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        background-color 0.4s ease;
+    /* Scanline shimmer */
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.30);
+}
+
+/* Tick-mark segments drawn with a repeating gradient — 10 divisions */
+#health-bar-segments {
     position: absolute;
     inset: 0;
-    display: grid;
-    place-items: center;
-    color: white;
-    font-size: 11px;
-    letter-spacing: 0.04em;
-}
-
-#inventory-hud {
-    position: fixed;
-    left: 50%;
-    bottom: 18px;
-    transform: translateX(-50%);
-    color: #fff8d8;
-    font-family: system-ui, sans-serif;
-    font-weight: 800;
-    text-shadow: 1px 2px 0 #171329;
-    z-index: 9999;
+    background: repeating-linear-gradient(to right,
+            transparent 0%,
+            transparent calc(10% - 1px),
+            rgba(0, 0, 0, 0.35) calc(10% - 1px),
+            rgba(0, 0, 0, 0.35) 10%);
     pointer-events: none;
 }
 
-.inventory-selected {
-    margin-bottom: 6px;
-    text-align: center;
-    font-size: 12px;
-    letter-spacing: 0.1em;
-}
-
-.inventory-slots {
-    display: flex;
-    gap: 7px;
-}
-
-.inventory-slot {
-    display: grid;
-    grid-template-columns: 24px 1fr;
-    grid-template-rows: auto auto;
-    column-gap: 7px;
-    min-width: 92px;
-    padding: 7px 9px;
-    background: rgba(43, 34, 67, 0.94);
-    border: 2px solid #171329;
-    border-radius: 9px;
-    box-shadow: 0 3px 0 #171329;
-}
-
-.inventory-slot.is-selected {
-    background: #64528c;
-    border-color: #fff0a8;
-    transform: translateY(-3px);
-}
-
-.inventory-slot.is-empty {
-    opacity: 0.7;
-}
-
-.inventory-key {
-    grid-row: 1 / 3;
-    align-self: center;
-    color: #ffe875;
-    font-size: 18px;
-    text-align: center;
-}
-
-.inventory-name {
+/* Numeric label */
+#health-bar-label {
+    font-family: monospace;
     font-size: 11px;
-    letter-spacing: 0.06em;
+    color: rgba(255, 220, 180, 0.85);
+    /* warm cream — matches the sunset */
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    min-width: 48px;
+    text-align: right;
 }
 
-.inventory-count {
-    color: #cfc5e8;
-    font-size: 10px;
+/* Critical state: pulse the whole widget */
+#health-bar-root.health-critical {
+    border-color: rgba(217, 64, 64, 0.80);
+    animation: hb-fadein 0.6s ease both, hb-critical-pulse 0.9s ease-in-out infinite;
 }
 
-@media (max-width: 480px) {
-    .inventory-slot {
-        min-width: 72px;
-        padding: 6px;
+#health-bar-root.health-critical #health-bar-icon {
+    animation: hb-beat-fast 0.5s ease-in-out infinite;
+}
+
+/* ── Damage Flash ───────────────────────────────────────────────────────── */
+
+#damage-flash {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    opacity: 0;
+    /* Vignette: red bleeds in from screen edges */
+    background: radial-gradient(ellipse at center,
+            transparent 55%,
+            rgba(180, 20, 20, 0.70) 100%);
+}
+
+#damage-flash.damage-flash-active {
+    animation: hb-damage-flash 0.45s ease-out forwards;
+}
+
+/* ── Keyframes ──────────────────────────────────────────────────────────── */
+
+@keyframes hb-fadein {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes hb-beat {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    14% {
+        transform: scale(1.25);
+    }
+
+    28% {
+        transform: scale(1);
+    }
+
+    42% {
+        transform: scale(1.15);
+    }
+
+    56% {
+        transform: scale(1);
+    }
+}
+
+@keyframes hb-beat-fast {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.35);
+    }
+}
+
+@keyframes hb-critical-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 180, 80, 0.08);
+    }
+
+    50% {
+        box-shadow: 0 0 10px 2px rgba(217, 64, 64, 0.45), inset 0 1px 0 rgba(255, 180, 80, 0.08);
+    }
+}
+
+@keyframes hb-damage-flash {
+    0% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
     }
 }

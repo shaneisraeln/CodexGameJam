@@ -6,7 +6,6 @@ import { Renderer } from './Engine/Rendering/Renderer.js';
 import { Material } from './Engine/Rendering/Material.js';
 import { RenderTarget } from './Engine/Rendering/RenderTarget.js';
 import { GameObject } from './Engine/Core/GameObject.js';
-import { Health } from './Engine/Core/Health.js';
 import { Time } from './Engine/Core/TimeManager.js';
 import { ObjLoader } from './Engine/Loaders/ObjLoader.js';
 import { Texture } from './Engine/Rendering/Texture.js';
@@ -22,7 +21,6 @@ import { ProfilerInstrumenter } from './Engine/Profiling/Profiler.js';
 import { Editor } from './Editor/Editor.js';
 import { FirstPersonController } from './FirstPersonController.js';
 import { FirstPersonHand } from './FirstPersonHand.js';
-import { PlayerInventory } from './PlayerInventory.js';
 import { FloatingObjectSpawner } from './FloatingObjectSpawner.js';
 
 
@@ -39,10 +37,22 @@ import BuoyancyVs from './Engine/shaders/Buoyancy.vert?raw';
 import treeWaveVs from './Engine/shaders/TreeWave.vert?raw';
 import masterVs from './Engine/shaders/ShaderLib/Master.vert?raw';
 import masterFs from './Engine/shaders/ShaderLib/Master.frag?raw';
-import { HexGridMesh } from './HexGridMesh.js';
-import { LandObjectSpawner } from './LandObjectSpawner.js';
+import {
+    HexGridMesh
+} from './HexGridMesh.js';
+import {
+    LandObjectSpawner
+} from './LandObjectSpawner.js';
 import CONTINENT from './CustomMapNoise.js';
-import { Vector3 } from './Engine/Math/Vector3.js';
+import {
+    Vector3
+} from './Engine/Math/Vector3.js';
+import {
+    PlayerHealth
+} from './PlayerHealth.js';
+import {
+    EnemySpawner
+} from './Enemies/EnemySpawner.js';
 
 // #endregion
 
@@ -56,7 +66,9 @@ const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/
 
 const canvas = document.getElementById('glcanvas');
 const gl = canvas.getContext('webgl2') || canvas.getContext('experimental-webgl');
-if (!gl) { alert('Unable to initialize WebGL.'); }
+if (!gl) {
+    alert('Unable to initialize WebGL.');
+}
 
 // WebGL state setup
 gl.enable(gl.DEPTH_TEST);
@@ -72,28 +84,36 @@ gl.getExtension('EXT_color_buffer_float');
 
 // Albedo — 8bit RGBA is enough, no need for float
 let sceneBuffer = new RenderTarget(gl, window.innerWidth, window.innerHeight, {
-    format: 'RGBA', precision: '8',
-    minFilter: gl.NEAREST, magFilter: gl.NEAREST
+    format: 'RGBA',
+    precision: '8',
+    minFilter: gl.NEAREST,
+    magFilter: gl.NEAREST
 });
 
 // Depth — single channel, needs 32f for precision
 let Gbuffer = new RenderTarget(gl, window.innerWidth, window.innerHeight, {
-    format: 'RGBA', precision: '8',
+    format: 'RGBA',
+    precision: '8',
     depth: true,
-    minFilter: gl.NEAREST, magFilter: gl.NEAREST
+    minFilter: gl.NEAREST,
+    magFilter: gl.NEAREST
 });
 
 // Pixel art pass — 8bit RGBA, plain color output
 let pixelArtBuffer = new RenderTarget(gl, window.innerWidth, window.innerHeight, {
-    format: 'RGB', precision: '8',
+    format: 'RGB',
+    precision: '8',
     depth: false,
-    minFilter: gl.NEAREST, magFilter: gl.NEAREST
+    minFilter: gl.NEAREST,
+    magFilter: gl.NEAREST
 });
 
 let lightingBuffer = new RenderTarget(gl, window.innerWidth, window.innerHeight, {
-    format: 'RGB', precision: '8',
+    format: 'RGB',
+    precision: '8',
     depth: false,
-    minFilter: gl.NEAREST, magFilter: gl.NEAREST
+    minFilter: gl.NEAREST,
+    magFilter: gl.NEAREST
 });
 
 // #endregion
@@ -137,19 +157,19 @@ const matPixelArt = new Material(shaderPixelArt, 'PixelArt');
 const matScreen = new Material(shaderScreen, 'Screen');
 
 // Buoyancy material setup
-matBuoyancy.setUniforms({ 
-    'uColor': [1.0, 1.0, 1.0, 1.0], 
-    'uHasTexture': 1.0, 
-    'uMainTex': shipTexture.texture, 
+matBuoyancy.setUniforms({
+    'uColor': [1.0, 1.0, 1.0, 1.0],
+    'uHasTexture': 1.0,
+    'uMainTex': shipTexture.texture,
     'uRoughness': 1.0,
-    'uSampleRadius': 0.25  // Multi-point wave sampling for smooth buoyancy
+    'uSampleRadius': 0.25 // Multi-point wave sampling for smooth buoyancy
 });
 
 // Scene material setup
-matScene.setUniforms({ 
-    'uColor': [1.0, 1.0, 1.0, 1.0], 
-    'uHasTexture': 1.0, 
-    'uMainTex': shipTexture.texture, 
+matScene.setUniforms({
+    'uColor': [1.0, 1.0, 1.0, 1.0],
+    'uHasTexture': 1.0,
+    'uMainTex': shipTexture.texture,
     'uRoughness': 1.0
 });
 
@@ -180,10 +200,10 @@ matGrassWave.setUniforms({
     'uWindDir': [1.0, 0.5], // New: Direction the breeze flows
 });
 
-planeTer.setUniforms({ 
-    'uColor': [1.0, 1.0, 1.0, 1.0], 
-    'uHasTexture': 0.0, 
-    'uMainTex': islandTexture.texture, 
+planeTer.setUniforms({
+    'uColor': [1.0, 1.0, 1.0, 1.0],
+    'uHasTexture': 0.0,
+    'uMainTex': islandTexture.texture,
     'uRoughness': 1.0
 });
 
@@ -192,12 +212,12 @@ matPixelArt.setUniforms({
     'uPixelSize': isMobile ? 1 : 1.0,
     'uEdgeWidth': 1,
     'uColorLevels': 128.0,
-    'uEdgeDistance' : 1,
-    'uCurvature' : 2,
+    'uEdgeDistance': 1,
+    'uCurvature': 2,
     'uDepthThreshold': 0.01,
     'uNormalThreshold': 0.3,
-    'uSilhouetteDarkening': 0.2, 
-    'uCreaseDarkening': 0.7,   
+    'uSilhouetteDarkening': 0.2,
+    'uCreaseDarkening': 0.7,
 });
 
 // Lighting material setup
@@ -232,23 +252,25 @@ const waterConfig = {
     'udisplacement': 1.5,
     'uScale': 1,
     'uBuoyancyRotation': 0.3,
-    'uColor1': [0.090, 0.271, 0.490], 
-    'uColor2': [0.192, 0.404, 0.624],  
-    'uColor3': [0.800, 0.800, 1.000],   
-    'uColor1Smoothstep': [0, 0.5],   
-    'uColor2Smoothstep': [0, 2],   
+    'uColor1': [0.090, 0.271, 0.490],
+    'uColor2': [0.192, 0.404, 0.624],
+    'uColor3': [0.800, 0.800, 1.000],
+    'uColor1Smoothstep': [0, 0.5],
+    'uColor2Smoothstep': [0, 2],
     'uWaveA': [-0.35, 0.70, 0.13, 3.92],
     'uWaveB': [-0.95, 0.51, 0.10, 2.25],
     'uWaveC': [-0.4, -2, 0.1, 13.5],
     'uColorBands': 3.0,
     'uRoughness': 0.0,
-    'uDepthThreshold':0.5,
-    'uFoamIntensity':1.0
+    'uDepthThreshold': 0.5,
+    'uFoamIntensity': 1.0
 };
 
 matBuoyancy.setUniforms(waterConfig);
 matWater.setUniforms(waterConfig);
-matBuoyancy.setUniforms({ 'uRoughness': 1.0 });
+matBuoyancy.setUniforms({
+    'uRoughness': 1.0
+});
 
 // Register Materials for Editor
 const materials = {
@@ -261,7 +283,10 @@ const materials = {
     'GrassWave': matGrassWave,
     'planeTer': planeTer
 };
-var  a = {num: 10, num2 : 20}
+var a = {
+    num: 10,
+    num2: 20
+}
 
 
 // #endregion
@@ -333,7 +358,7 @@ renderQueue.addPass(viewportPass);
 
 function resizeCanvas() {
     // 1. Physical Canvas size (the display size on screen)
-    canvas.width = window.innerWidth ;
+    canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
     // 2. Calculate the internal "Render Resolution"
@@ -343,14 +368,14 @@ function resizeCanvas() {
 
     // 3. Set the Viewport to match the Render Resolution
     gl.viewport(0, 0, renderW, renderH);
-    
+
     // 4. Resize your Buffers to the Render Resolution, NOT the window size
     // This is where the actual performance gain happens
     sceneBuffer.resize(renderW, renderH);
     Gbuffer.resize(renderW, renderH);
     lightingBuffer.resize(renderW, renderH);
     pixelArtBuffer.resize(renderW, renderH);
-    
+
     renderQueue.resize(renderW, renderH);
 
     // 5. Camera aspect ratio should still use the visual aspect
@@ -378,7 +403,7 @@ const size = 30.0;
 
 
 let Terrain = new GameObject(renderer, planeTer, new HexGridMesh(gl, 255, 255, 1.0, true), 'Scense');
-Terrain.transform.position.set( -(255 * Math.sqrt(3)/2), -11 , -(255 * 1.5/2));
+Terrain.transform.position.set(-(255 * Math.sqrt(3) / 2), -11, -(255 * 1.5 / 2));
 Terrain.transform.scale.set(1, 0.4, 1);
 scene.push(Terrain);
 
@@ -405,19 +430,23 @@ const landSpawner = new LandObjectSpawner(gl, renderer, matScene, scene, [], {
 });
 
 const oceanConfig = {
-    direction: { x: 0.207, y: 0, z: -0.707 },
+    direction: {
+        x: 0.207,
+        y: 0,
+        z: -0.707
+    },
     speed: 0.0
 };
 
 const floatingSpawnConfig = {
-    enabled: true ,
+    enabled: true,
     count: 50,
     seed: 68,
     bounds: {
-        minX: -(255 * Math.sqrt(3)/2),
-        maxX: (255 * Math.sqrt(3)/2),
-        minZ: -(255 * 1.5/2),
-        maxZ: (255 * 1.5/2)
+        minX: -(255 * Math.sqrt(3) / 2),
+        maxX: (255 * Math.sqrt(3) / 2),
+        minZ: -(255 * 1.5 / 2),
+        maxZ: (255 * 1.5 / 2)
     },
     yFixed: -6.25
 };
@@ -441,7 +470,7 @@ function rebuildTerrain() {
         if (idx >= 0) scene.splice(idx, 1);
     }
     Terrain = new GameObject(renderer, planeTer, new HexGridMesh(gl, 255, 255, 1.0, true), 'Scense');
-    Terrain.transform.position.set( -(255 * Math.sqrt(3)/2), -11 , -(255 * 1.5/2));
+    Terrain.transform.position.set(-(255 * Math.sqrt(3) / 2), -11, -(255 * 1.5 / 2));
     Terrain.transform.scale.set(1, 0.4, 1);
     scene.push(Terrain);
 }
@@ -481,7 +510,7 @@ if (floatingSpawnConfig.enabled) {
 let CenterLOD = null;
 let meshLOD1 = new HexGridMesh(gl, 255, 255, 1.0)
 const centerObj = new GameObject(renderer, matWater, meshLOD1, `Water Floor [0,0]`);
-centerObj.transform.position.set(-(255 * Math.sqrt(3)/2), -6.5, -(255 * 1.5/2));
+centerObj.transform.position.set(-(255 * Math.sqrt(3) / 2), -6.5, -(255 * 1.5 / 2));
 centerObj.transform.scale.set(1, 1, 1);
 scene.push(centerObj);
 CenterLOD = centerObj;
@@ -499,7 +528,7 @@ Promise.all([
     const yPos = -6.5;
     const scale = 50;
     const radius = 5;
-    
+
 
     // Mobile: LOD2 center, LOD3 everything else
     // Desktop: LOD1 center, LOD2 mid ring, LOD3 outer
@@ -511,7 +540,7 @@ Promise.all([
 
     // Center water mesh
     const centerObj = new GameObject(renderer, matWater, centerMesh, `Water Floor [0,0] ${centerLabel}`);
-    centerObj.transform.position.set(-(255 * Math.sqrt(3)/2), yPos-0.5, -(255 * 1.5/2));
+    centerObj.transform.position.set(-(255 * Math.sqrt(3) / 2), yPos - 0.5, -(255 * 1.5 / 2));
     centerObj.transform.scale.set(1, 1, 1);
     scene.push(centerObj);
     CenterLOD = centerObj;
@@ -524,7 +553,7 @@ Promise.all([
 
                 const obj = new GameObject(renderer, matWater, meshLOD3, `Water Floor [${x},${z}] LOD3`);
                 centerObj.transform.add(obj.transform);
-                obj.transform.setGlobalPosition(x * offset, yPos-0.5, z * offset);
+                obj.transform.setGlobalPosition(x * offset, yPos - 0.5, z * offset);
                 obj.transform.scale.set(scale, scale, scale);
 
             }
@@ -536,12 +565,12 @@ Promise.all([
                 if (x === 0 && z === 0) continue;
 
                 const dist = Math.sqrt(x * x + z * z);
-                const mesh = dist <= LOD1_RADIUS ? meshLOD1 
-                    : dist <= LOD2_RADIUS ? meshLOD2 
-                    : meshLOD3;
-                const lodLevel = dist <= LOD1_RADIUS ? 1 
-                    : dist <= LOD2_RADIUS ? 2 
-                    : 3;
+                const mesh = dist <= LOD1_RADIUS ? meshLOD1 :
+                    dist <= LOD2_RADIUS ? meshLOD2 :
+                    meshLOD3;
+                const lodLevel = dist <= LOD1_RADIUS ? 1 :
+                    dist <= LOD2_RADIUS ? 2 :
+                    3;
 
                 const obj = new GameObject(renderer, matWater, mesh, `Water Floor [${x},${z}] LOD${lodLevel}`);
                 centerObj.transform.add(obj.transform);
@@ -557,9 +586,13 @@ Promise.all([
 
 // #region Viewport Configuration
 
-const viewports = [
-    { x: 0.0, y: 0.0, w: 1.0, h: 1.0, pass: 'Final' }
-];
+const viewports = [{
+    x: 0.0,
+    y: 0.0,
+    w: 1.0,
+    h: 1.0,
+    pass: 'Final'
+}];
 viewportPass.setViewports(viewports);
 
 // #endregion
@@ -613,7 +646,7 @@ updatePlayerHealthBar();
 // #region Game API
 
 game.setViewports = (mode) => {
-    viewports[0].pass = mode; 
+    viewports[0].pass = mode;
 };
 game.damagePlayer = (amount, source = null) => playerHealth.takeDamage(amount, source);
 game.healPlayer = (amount, source = null) => playerHealth.heal(amount, source);
@@ -651,7 +684,7 @@ game.respawnWithSeed = (seed) => {
     scene.push(...staticObjects);
     floatingObjects = [];
     landObjects = [];
-    
+
     // Set new seed and spawn
     floatingSpawner.setSeed(seed);
     landSpawner.setSeed(seed);
@@ -679,12 +712,50 @@ game.respawnWithSeed = (seed) => {
 
 let profiler = null;
 
-    if (!isMobile) {
-        const editor = new Editor(game);
-        game.editor = editor;
-        profiler = ProfilerInstrumenter.attach(renderQueue, renderer, game);
-        game.profiler = profiler;
+if (!isMobile) {
+    const editor = new Editor(game);
+    game.editor = editor;
+    profiler = ProfilerInstrumenter.attach(renderQueue, renderer, game);
+    game.profiler = profiler;
+}
+
+// #region Player Health
+
+const playerHealth = new PlayerHealth({
+    maxHp: 100,
+    onDeath: () => {
+        console.log('Player died.');
+        // Future: show death screen, respawn logic, etc.
+    },
+    onDamage: (amount, current, max) => {
+        console.log(`Player took ${amount} damage — ${current}/${max} HP remaining.`);
     }
+});
+
+game.playerHealth = playerHealth;
+
+// #endregion
+
+// #region Enemies
+
+const enemySpawner = new EnemySpawner(gl, renderer, matScene, scene, {
+    seed: floatingSpawnConfig.seed,
+    minNoiseValue: 0.42,
+    collisionWorld
+});
+
+let enemies = [];
+
+enemySpawner.spawnGroups(6, floatingSpawnConfig.bounds).then(spawned => {
+    enemies = spawned;
+    game.enemies = enemies; // keep game object in sync
+    console.log(`[Enemies] Spawned ${spawned.length} enemies in 6 groups.`);
+});
+
+game.enemySpawner = enemySpawner;
+game.enemies = enemies;
+
+// #endregion
 
 // Expose game object globally for console access
 window.game = game;
@@ -777,14 +848,39 @@ function loop(now) {
     firstPersonHand.update(Time.deltaTime);
     playerInventory.update(Time.deltaTime);
 
-    
+    // ── Enemy update loop ────────────────────────────────────────────────
+    if (enemies.length > 0) {
+        const playerPos = camera.transform.position;
+        const enemyContext = {
+            playerPosition: playerPos,
+            allEnemies: enemies,
+            playerHealth,
+            collisionWorld
+        };
+        for (let i = 0; i < enemies.length; i++) {
+            enemies[i].update(Time.deltaTime, enemyContext);
+        }
+    }
+    // ────────────────────────────────────────────────────────────────────
+
+
     // Update material uniforms with time
-    matWater.setUniforms({ 'uTime': Time.time });
-    matBuoyancy.setUniforms({ 'uTime': Time.time });
-    matTreeWave.setUniforms({ 'uTime': Time.time });
-    matGrassWave.setUniforms({ 'uTime': Time.time });
-    matSkybox.setUniforms({ 'uTime': Time.time });
-    
+    matWater.setUniforms({
+        'uTime': Time.time
+    });
+    matBuoyancy.setUniforms({
+        'uTime': Time.time
+    });
+    matTreeWave.setUniforms({
+        'uTime': Time.time
+    });
+    matGrassWave.setUniforms({
+        'uTime': Time.time
+    });
+    matSkybox.setUniforms({
+        'uTime': Time.time
+    });
+
     // Update light direction
     if (matLighting.uniforms['uLightDir'] && matLighting.uniforms['uLightDir'].value) {
         const v = matLighting.uniforms['uLightDir'].value;
@@ -797,9 +893,9 @@ function loop(now) {
             lightDir[0] = v[0];
             lightDir[1] = v[1];
             lightDir[2] = v[2];
-            
+
         }
-        lightingPass.lightDir = new Vector3(lightDir[0], lightDir[1], lightDir[2] );
+        lightingPass.lightDir = new Vector3(lightDir[0], lightDir[1], lightDir[2]);
     }
 
     camera.updateView();
@@ -808,14 +904,14 @@ function loop(now) {
 
 
     gl.bindBuffer(gl.UNIFORM_BUFFER, ubo);
-    gl.bufferSubData(gl.UNIFORM_BUFFER, 0,   new Float32Array(camera.projectionMatrix));
-    gl.bufferSubData(gl.UNIFORM_BUFFER, 64,  new Float32Array(camera.viewMatrix));
+    gl.bufferSubData(gl.UNIFORM_BUFFER, 0, new Float32Array(camera.projectionMatrix));
+    gl.bufferSubData(gl.UNIFORM_BUFFER, 64, new Float32Array(camera.viewMatrix));
     gl.bufferSubData(gl.UNIFORM_BUFFER, 128, new Float32Array([camera.transform.position.x, camera.transform.position.y, camera.transform.position.z]));
 
     // Update skybox lighting
     if (matSkybox.uniforms['uSunColor']) {
-        skyboxPass.setLight(lightDir, 
-            matSkybox.uniforms['uSunColor'].value, 
+        skyboxPass.setLight(lightDir,
+            matSkybox.uniforms['uSunColor'].value,
             matSkybox.uniforms['uTopColor'].value,
             matSkybox.uniforms['uMidColor'].value,
             matSkybox.uniforms['uBottomColor'].value
@@ -824,14 +920,14 @@ function loop(now) {
 
     renderQueue.execute(renderer, scene, camera);
     gl.flush()
-    gl.finish() 
+    gl.finish()
     // Update HUD with performance metrics
     const hud = document.getElementById('hud');
     if (hud) {
         hudUpdateCounter++;
         if (hudUpdateCounter >= 6) {
             hudUpdateCounter = 0;
-            
+
             const fpsValue = Time.unscaledDeltaTime > 0 ? Math.round(1.0 / Time.unscaledDeltaTime) : 0;
             const fps = fpsValue.toString().padStart(3, '0');
 
@@ -859,4 +955,3 @@ function loop(now) {
 // #endregion
 
 requestAnimationFrame(loop);
-
