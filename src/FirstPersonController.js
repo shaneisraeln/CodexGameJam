@@ -7,6 +7,7 @@ import CONTINENT from './CustomMapNoise.js';
  */
 export class FirstPersonController {
     constructor(camera, domElement, options = {}) {
+        const { collisionWorld = null, ...settings } = options;
         this.camera = camera;
         this.domElement = domElement;
 
@@ -33,8 +34,12 @@ export class FirstPersonController {
             waterLevel: -7,
             minWaterClearance: 0.35,
             maxStepHeight: 4,
-            ...options
+            collisionRadius: 0.32,
+            collisionLayerMask: 0xffffffff,
+            collisionActorLayer: 0xffffffff,
+            ...settings
         };
+        this.collisionWorld = collisionWorld;
 
         this.keys = new Set();
         this.pitch = camera.transform.rotation.x;
@@ -169,6 +174,22 @@ export class FirstPersonController {
             if (nextZGround !== null && nextZGround >= position.y - this.settings.eyeHeight - this.settings.maxStepHeight) {
                 position.z += dz;
                 moved ||= Math.abs(dz) > 0;
+            }
+
+            if (this.collisionWorld) {
+                const collision = this.collisionWorld.resolveCircle(
+                    position.x,
+                    position.z,
+                    this.settings.collisionRadius,
+                    {
+                        minY: position.y - this.settings.eyeHeight,
+                        maxY: position.y,
+                        layerMask: this.settings.collisionLayerMask,
+                        actorLayer: this.settings.collisionActorLayer
+                    }
+                );
+                position.x = collision.x;
+                position.z = collision.z;
             }
         }
 

@@ -10,6 +10,7 @@ import { Time } from './Engine/Core/TimeManager.js';
 import { ObjLoader } from './Engine/Loaders/ObjLoader.js';
 import { Texture } from './Engine/Rendering/Texture.js';
 import { RenderQueue } from './Engine/Rendering/RenderQueue.js';
+import { CollisionWorld, CollisionLayer } from './Engine/Physics/CollisionWorld.js';
 import { ObjectRenderPass } from './Engine/Rendering/ObjectRenderPass.js';
 import { ViewportPass } from './Engine/Rendering/Passes/ViewportPass.js';
 import { LightingPass } from './Engine/Rendering/Passes/LightingPass.js';
@@ -269,6 +270,10 @@ const renderer = new Renderer(gl);
 const camera = new Camera();
 const scene = [];
 const renderQueue = new RenderQueue(gl);
+const collisionWorld = new CollisionWorld({
+    cellSize: 16,
+    defaultLayer: CollisionLayer.WORLD
+});
 
 // #endregion
 
@@ -391,6 +396,7 @@ scene.push(Terrain);
 const floatingSpawner = new FloatingObjectSpawner(gl, renderer, matBuoyancy, scene);
 const landSpawner = new LandObjectSpawner(gl, renderer, matScene, scene, [], {
     threshold: 0.425,
+    collisionWorld,
     materials: {
         TreeWave: matTreeWave
     }
@@ -569,6 +575,7 @@ const game = {
     wireframePass,
     floatingSpawner,
     landSpawner,
+    collisionWorld,
     floatingSpawnConfig,
     textures: {
         ship: shipTexture
@@ -606,6 +613,7 @@ game.spawnLandObjects = async (count) => {
 
 // Seed-based spawning control
 game.respawnWithSeed = (seed) => {
+    landSpawner.clearCollisionObjects();
     // Keep only non-random objects (water LOD tiles, terrain, etc.)
     // Filter out anything with "[Floating]" or "[Land]" in the name
     const staticObjects = scene.filter(
@@ -654,12 +662,17 @@ let profiler = null;
 window.game = game;
 window.floatingSpawner = floatingSpawner;
 window.landSpawner = landSpawner;
+window.collisionWorld = collisionWorld;
 window.oceanConfig = oceanConfig;
 window.floatingObjects = floatingObjects;
 window.landObjects = landObjects;
 window.floatingSpawnConfig = floatingSpawnConfig;
 
-const cameraController = new FirstPersonController(camera, canvas);
+const cameraController = new FirstPersonController(camera, canvas, {
+    collisionWorld,
+    collisionLayerMask: CollisionLayer.WORLD,
+    collisionActorLayer: CollisionLayer.PLAYER
+});
 game.cameraController = cameraController;
 const firstPersonHand = new FirstPersonHand(gl, renderer, shaderMain, camera, scene, {
     controller: cameraController,

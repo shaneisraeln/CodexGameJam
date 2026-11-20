@@ -33,6 +33,9 @@ export class LandObjectSpawner {
             modelFiles = [];
         }
 
+        this.collisionWorld = options.collisionWorld || null;
+        this.colliderHandles = [];
+
         this.seed = options.seed || 12345;
         this.currentState = this.seed;
         this.noise = CONTINENT;
@@ -52,12 +55,12 @@ export class LandObjectSpawner {
         // Catalog in FloatingObjectSpawner-style with weighted probabilities.
         this.modelCatalog = [
             // Palms (trees) - spawn on land > 0.45
-            { file: 'palm-detailed-straight.obj', name: 'Palm Detailed Straight', rotationMode: 'y-only', scale: 1.0, scaleRange: [0.75, 1.10], yOffset: 0.0, probability: 0.1, thresholdCallback: palmThreshold, materialKey: 'TreeWave' },
-            { file: 'palm-detailed-bend.obj', name: 'Palm Detailed Bend', rotationMode: 'y-only', scale: 1.0, scaleRange: [0.75, 1.10], yOffset: 0.0, probability: 0.1, thresholdCallback: palmThreshold, materialKey: 'TreeWave' },
-            { file: 'palm-detailed-bend2.obj', name: 'Palm Detailed Bend2', rotationMode: 'y-only', scale: 1.0,scaleRange: [0.75, 1.10],  yOffset: 0.0, probability: 0.1, thresholdCallback: palmThreshold, materialKey: 'TreeWave' },
-            { file: 'palm-rare.obj', name: 'Palm rare', rotationMode: 'y-only', scale: 1.0, yOffset: 0.0, scaleRange: [0.75, 1.10], probability: 0.01, thresholdCallback: palmThreshold, materialKey: 'TreeWave' },
-            { file: 'palm-s.obj', name: 'Palm s', rotationMode: 'y-only', scale: 1.0, yOffset: 0.0, scaleRange: [0.75, 1.10], probability: 0.1, thresholdCallback: palmThresholdS, materialKey: 'TreeWave' },
-            { file: 'palm-small.obj', name: 'Palm small', rotationMode: 'y-only', scale: 1.0, yOffset: -0.2, scaleRange: [0.75, 1.10], probability: 0.1, thresholdCallback: palmThreshold, materialKey: 'TreeWave' },
+            { file: 'palm-detailed-straight.obj', name: 'Palm Detailed Straight', rotationMode: 'y-only', scale: 1.0, scaleRange: [0.75, 1.10], yOffset: 0.0, probability: 0.1, thresholdCallback: palmThreshold, materialKey: 'TreeWave', collisionRadiusScale: 0.65 },
+            { file: 'palm-detailed-bend.obj', name: 'Palm Detailed Bend', rotationMode: 'y-only', scale: 1.0, scaleRange: [0.75, 1.10], yOffset: 0.0, probability: 0.1, thresholdCallback: palmThreshold, materialKey: 'TreeWave', collisionRadiusScale: 0.65 },
+            { file: 'palm-detailed-bend2.obj', name: 'Palm Detailed Bend2', rotationMode: 'y-only', scale: 1.0,scaleRange: [0.75, 1.10],  yOffset: 0.0, probability: 0.1, thresholdCallback: palmThreshold, materialKey: 'TreeWave', collisionRadiusScale: 0.65 },
+            { file: 'palm-rare.obj', name: 'Palm rare', rotationMode: 'y-only', scale: 1.0, yOffset: 0.0, scaleRange: [0.75, 1.10], probability: 0.01, thresholdCallback: palmThreshold, materialKey: 'TreeWave', collisionRadiusScale: 0.65 },
+            { file: 'palm-s.obj', name: 'Palm s', rotationMode: 'y-only', scale: 1.0, yOffset: 0.0, scaleRange: [0.75, 1.10], probability: 0.1, thresholdCallback: palmThresholdS, materialKey: 'TreeWave', collisionRadiusScale: 0.65 },
+            { file: 'palm-small.obj', name: 'Palm small', rotationMode: 'y-only', scale: 1.0, yOffset: -0.2, scaleRange: [0.75, 1.10], probability: 0.1, thresholdCallback: palmThreshold, materialKey: 'TreeWave', collisionRadiusScale: 0.65 },
 
             // Grass - spawn on land > 0.45
             // // { file: 'grass.obj', name: 'Grass', rotationMode: 'y-only', scale: 1.0, scaleRange: [0.75, 1.35], yOffset: 0.0, probability: 0.1, thresholdCallback: grassThreshold },
@@ -260,8 +263,27 @@ export class LandObjectSpawner {
         const rotation = this.getRandomRotation(modelDef.rotationMode);
         obj.transform.rotation.set(rotation.x, rotation.y, rotation.z);
 
+        if (this.collisionWorld) {
+            const collider = this.collisionWorld.addStaticObject(obj, {
+                radiusScale: modelDef.collisionRadiusScale ?? 1
+            });
+            if (collider) {
+                obj.collider = collider;
+                this.colliderHandles.push(collider);
+            }
+        }
+
         this.scene.push(obj);
         return obj;
+    }
+
+    clearCollisionObjects() {
+        if (!this.collisionWorld) return;
+        for (const collider of this.colliderHandles) {
+            this.collisionWorld.remove(collider);
+            if (collider.object) delete collider.object.collider;
+        }
+        this.colliderHandles.length = 0;
     }
 
     /**
