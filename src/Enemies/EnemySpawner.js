@@ -231,6 +231,39 @@ export class EnemySpawner {
         return spawned;
     }
 
+    /** Spread the existing enemies across valid land without changing their AI. */
+    scatterEnemies(bounds, minSpacing = 24) {
+        const placed = [];
+        for (const enemy of this.enemies) {
+            if (!enemy || enemy.isDead || !enemy.active) continue;
+            let position = null;
+            for (let attempt = 0; attempt < 60; attempt++) {
+                const candidate = this._sampleLandPosition(bounds);
+                if (!candidate) break;
+                if (placed.every((other) => Math.hypot(other.x - candidate.x, other.z - candidate.z) >= minSpacing)) {
+                    position = candidate;
+                    break;
+                }
+                position = candidate;
+            }
+            if (!position) continue;
+
+            enemy.transform.position.set(position.x, position.y, position.z);
+            const heading = this._rand() * Math.PI * 2;
+            enemy.heading = heading;
+            enemy._targetHeading = heading;
+            enemy.transform.rotation.set(0, heading, 0);
+            enemy.state = 'wander';
+            enemy._stateTime = 0;
+            enemy._giveUpTimer = 0;
+            if (enemy.collider && this.collisionWorld) {
+                this.collisionWorld.update(enemy.collider, position.x, position.y, position.z);
+            }
+            placed.push(position);
+        }
+        return placed.length;
+    }
+
     /** Backward-compatible alias. */
     async spawnMany(count, bounds) {
         return this.spawnGroups(count, bounds);

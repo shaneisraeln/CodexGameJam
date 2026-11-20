@@ -787,6 +787,7 @@ const deathScreen = new DeathScreen({
         enemySpawner.spawnGroups(3, floatingSpawnConfig.bounds, 5).then(spawned => {
             for (let i = 0; i < spawned.length; i++) enemies.push(spawned[i]);
             game.enemies = enemies;
+            if (introComplete) enemySpawner.scatterEnemies(floatingSpawnConfig.bounds, 24);
         });
     }
 });
@@ -831,6 +832,7 @@ const enemySpawner = new EnemySpawner(gl, renderer, matScene, scene, {
 });
 
 let enemies = [];
+let introComplete = false;
 
 // Active loot drops — ticked every frame, spliced out when collected/expired
 const drops = [];
@@ -838,6 +840,7 @@ const drops = [];
 enemySpawner.spawnGroups(3, floatingSpawnConfig.bounds, 5).then(spawned => {
     enemies = spawned;
     game.enemies = enemies; // keep game object in sync
+    if (introComplete) enemySpawner.scatterEnemies(floatingSpawnConfig.bounds, 24);
     console.log(`[Enemies] Spawned ${spawned.length} enemies for the escape story.`);
 });
 
@@ -954,7 +957,11 @@ const storyFlow = new StoryFlow({
     wreck: wreckObject,
     enemies: () => enemies,
     resources: resourceTracker,
-    required: shipRepairCost
+    required: shipRepairCost,
+    onIntroComplete: () => {
+        introComplete = true;
+        enemySpawner.scatterEnemies(floatingSpawnConfig.bounds, 24);
+    }
 });
 game.story = storyFlow;
 game.shipRepairCost = shipRepairCost;
@@ -1026,6 +1033,7 @@ function loop(now) {
         cameraController.keys.clear();
     }
     storyFlow.update(Time.deltaTime);
+    chestSpawner.interactionEnabled = storyFlow.phase === 'gameplay';
     firstPersonHand.update(Time.deltaTime);
     playerInventory.update(Time.deltaTime);
     chestSpawner.update(Time.deltaTime);

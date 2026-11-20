@@ -21,6 +21,10 @@ export class ChestSpawner {
         this.bounceDuration = 0.42;
         this.removeDelay = 0.28;
         this.interactionRange = 5;
+        this.interactionEnabled = false;
+        this.prompt = document.getElementById('chest-prompt');
+        this.progress = document.getElementById('chest-progress');
+        this.progressFill = document.getElementById('chest-progress-fill');
         this.lootTable = lootTable || [
             { item: 'food', probability: 1, minCount: 2, maxCount: 5 }
         ];
@@ -72,6 +76,8 @@ export class ChestSpawner {
             chest.removeElapsed = null;
             chest.baseY = chest.transform.position.y;
             chest.baseScale = 1;
+            chest.baseRotationY = chest.transform.rotation.y;
+            chest.idleElapsed = this.random() * Math.PI * 2;
             chest.lootTable = this.lootTable.map((entry) => ({ ...entry }));
             chest.update = (dt) => {
                 if (chest.removeElapsed !== null) {
@@ -88,11 +94,15 @@ export class ChestSpawner {
                     return;
                 }
                 if (chest.opened) return;
+                chest.idleElapsed += dt;
+                chest.transform.position.y = chest.baseY + Math.sin(chest.idleElapsed * 2.1) * 0.1;
+                chest.transform.rotation.y = chest.baseRotationY + Math.sin(chest.idleElapsed * 0.9) * 0.035;
+                const idleScale = 1 + Math.sin(chest.idleElapsed * 2.1) * 0.025;
                 const heldNearby = this.openingChest === chest && Math.hypot(chest.transform.position.x - this._playerPosition().x, chest.transform.position.z - this._playerPosition().z) <= this.interactionRange;
                 if (heldNearby) {
                     chest.interactionScale = Math.min(1.18, chest.interactionScale + dt * 0.8);
                     chest.openProgress = Math.min(1, chest.openProgress + dt / this.openDuration);
-                    chest.transform.scale.set(chest.interactionScale, chest.interactionScale, chest.interactionScale);
+                    chest.transform.scale.set(chest.interactionScale * idleScale, chest.interactionScale * idleScale, chest.interactionScale * idleScale);
                     if (chest.openProgress === 1) {
                         this._grantLoot(chest);
                         chest.removeElapsed = 0;
@@ -102,10 +112,12 @@ export class ChestSpawner {
                 } else if (chest.openProgress > 0) {
                     chest.openProgress = Math.max(0, chest.openProgress - dt * 2.5 / this.openDuration);
                     chest.interactionScale = Math.max(1, chest.interactionScale - dt * 0.8);
-                    chest.transform.scale.set(chest.interactionScale, chest.interactionScale, chest.interactionScale);
+                    chest.transform.scale.set(chest.interactionScale * idleScale, chest.interactionScale * idleScale, chest.interactionScale * idleScale);
                 } else if (chest.interactionScale > 1) {
                     chest.interactionScale = Math.max(1, chest.interactionScale - dt * 0.8);
-                    chest.transform.scale.set(chest.interactionScale, chest.interactionScale, chest.interactionScale);
+                    chest.transform.scale.set(chest.interactionScale * idleScale, chest.interactionScale * idleScale, chest.interactionScale * idleScale);
+                } else {
+                    chest.transform.scale.set(idleScale, idleScale, idleScale);
                 }
             };
             this.scene.push(chest);
@@ -118,6 +130,7 @@ export class ChestSpawner {
     _playerPosition() { return this.playerCamera?.transform.position || { x: Infinity, y: 0, z: Infinity }; }
 
     _findNearbyChest() {
+        if (!this.interactionEnabled) return null;
         const pos = this._playerPosition();
         let closest = null;
         let distance = this.interactionRange;
@@ -149,7 +162,27 @@ export class ChestSpawner {
         if (chestIndex !== -1) this.chests.splice(chestIndex, 1);
     }
 
-    update(dt) { for (const chest of this.chests) chest.update(dt); }
+    _updateInteractionHud() {
+        const chest = this._findNearbyChest();
+        if (!chest) {
+            this.prompt?.classList.remove('chest-prompt-visible');
+            this.progress?.classList.remove('chest-progress-visible');
+            return;
+        }
+        const opening = this.openingChest === chest;
+        if (this.prompt) {
+            this.prompt.textContent = opening ? 'OPENING CHEST…' : 'PRESS AND HOLD E TO OPEN';
+            this.prompt.classList.add('chest-prompt-visible');
+        }
+        const showProgress = opening || chest.openProgress > 0;
+        this.progress?.classList.toggle('chest-progress-visible', showProgress);
+        if (this.progressFill) this.progressFill.style.width = `${Math.round(chest.openProgress * 100)}%`;
+    }
+
+    update(dt) {
+        for (const chest of this.chests) chest.update(dt);
+        this._updateInteractionHud();
+    }
     dispose() {
         window.removeEventListener('keydown', this._keyDown);
         window.removeEventListener('keyup', this._keyUp);

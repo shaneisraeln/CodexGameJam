@@ -1,6 +1,6 @@
 /** Short camera-driven intro and finale for the island escape objective. */
 export class StoryFlow {
-    constructor({ camera, controller, wreck, resources, required, enemies, onWin }) {
+    constructor({ camera, controller, wreck, resources, required, enemies, onWin, onIntroComplete }) {
         this.camera = camera;
         this.controller = controller;
         this.wreck = wreck;
@@ -8,6 +8,7 @@ export class StoryFlow {
         this.required = required;
         this.enemies = enemies || [];
         this.onWin = onWin;
+        this.onIntroComplete = onIntroComplete;
         this.phase = 'intro';
         this.phaseTime = 0;
         this.repairProgress = 0;
@@ -50,6 +51,7 @@ export class StoryFlow {
         this.phase = 'gameplay';
         this.phaseTime = 0;
         this._restorePlayerCamera();
+        this.onIntroComplete?.();
         this._hideCard();
         this.objective?.classList.add('objective-visible');
         this.controller?.keys.clear();
