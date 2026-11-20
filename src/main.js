@@ -1,29 +1,78 @@
 // #region Imports
 
-import { Camera } from './Engine/Rendering/Camera.js';
-import { Shader } from './Engine/Rendering/Shader.js';
-import { Renderer } from './Engine/Rendering/Renderer.js';
-import { Material } from './Engine/Rendering/Material.js';
-import { RenderTarget } from './Engine/Rendering/RenderTarget.js';
-import { GameObject } from './Engine/Core/GameObject.js';
-import { Time } from './Engine/Core/TimeManager.js';
-import { ObjLoader } from './Engine/Loaders/ObjLoader.js';
-import { Texture } from './Engine/Rendering/Texture.js';
-import { RenderQueue } from './Engine/Rendering/RenderQueue.js';
-import { CollisionWorld, CollisionLayer } from './Engine/Physics/CollisionWorld.js';
-import { ObjectRenderPass } from './Engine/Rendering/ObjectRenderPass.js';
-import { ViewportPass } from './Engine/Rendering/Passes/ViewportPass.js';
-import { LightingPass } from './Engine/Rendering/Passes/LightingPass.js';
-import { SkyboxPass } from './Engine/Rendering/Passes/SkyboxPass.js';
-import { PixelArtPass } from './Engine/Rendering/Passes/PixelArtPass.js';
-import { WireframePass } from './Engine/Rendering/Passes/WireframePass.js';
-import { ProfilerInstrumenter } from './Engine/Profiling/Profiler.js';
-import { Editor } from './Editor/Editor.js';
-import { FirstPersonController } from './FirstPersonController.js';
-import { FirstPersonHand } from './FirstPersonHand.js';
-import { PlayerInventory } from './PlayerInventory.js';
-import { ChestSpawner } from './ChestSpawner.js';
-import { FloatingObjectSpawner } from './FloatingObjectSpawner.js';
+import {
+    Camera
+} from './Engine/Rendering/Camera.js';
+import {
+    Shader
+} from './Engine/Rendering/Shader.js';
+import {
+    Renderer
+} from './Engine/Rendering/Renderer.js';
+import {
+    Material
+} from './Engine/Rendering/Material.js';
+import {
+    RenderTarget
+} from './Engine/Rendering/RenderTarget.js';
+import {
+    GameObject
+} from './Engine/Core/GameObject.js';
+import {
+    Time
+} from './Engine/Core/TimeManager.js';
+import {
+    ObjLoader
+} from './Engine/Loaders/ObjLoader.js';
+import {
+    Texture
+} from './Engine/Rendering/Texture.js';
+import {
+    RenderQueue
+} from './Engine/Rendering/RenderQueue.js';
+import {
+    CollisionWorld,
+    CollisionLayer
+} from './Engine/Physics/CollisionWorld.js';
+import {
+    ObjectRenderPass
+} from './Engine/Rendering/ObjectRenderPass.js';
+import {
+    ViewportPass
+} from './Engine/Rendering/Passes/ViewportPass.js';
+import {
+    LightingPass
+} from './Engine/Rendering/Passes/LightingPass.js';
+import {
+    SkyboxPass
+} from './Engine/Rendering/Passes/SkyboxPass.js';
+import {
+    PixelArtPass
+} from './Engine/Rendering/Passes/PixelArtPass.js';
+import {
+    WireframePass
+} from './Engine/Rendering/Passes/WireframePass.js';
+import {
+    ProfilerInstrumenter
+} from './Engine/Profiling/Profiler.js';
+import {
+    Editor
+} from './Editor/Editor.js';
+import {
+    FirstPersonController
+} from './FirstPersonController.js';
+import {
+    FirstPersonHand
+} from './FirstPersonHand.js';
+import {
+    PlayerInventory
+} from './PlayerInventory.js';
+import {
+    ChestSpawner
+} from './ChestSpawner.js';
+import {
+    FloatingObjectSpawner
+} from './FloatingObjectSpawner.js';
 
 
 // Shader imports
@@ -58,6 +107,15 @@ import {
 import {
     Poof
 } from './Enemies/Poof.js';
+import {
+    ResourceTracker
+} from './ResourceTracker.js';
+import {
+    DeathScreen
+} from './DeathScreen.js';
+import {
+    AudioManager
+} from './AudioManager.js';
 
 // #endregion
 
@@ -429,9 +487,12 @@ const floatingSpawner = new FloatingObjectSpawner(gl, renderer, matBuoyancy, sce
 const chestSpawner = new ChestSpawner(gl, renderer, matScene, scene, null, {
     camera,
     seed: 68,
-    lootTable: [
-        { item: 'food', probability: 1, minCount: 2, maxCount: 5 }
-    ]
+    lootTable: [{
+        item: 'food',
+        probability: 1,
+        minCount: 2,
+        maxCount: 5
+    }]
 });
 const landSpawner = new LandObjectSpawner(gl, renderer, matScene, scene, [], {
     threshold: 0.425,
@@ -709,13 +770,52 @@ if (!isMobile) {
     game.profiler = profiler;
 }
 
+// #region Resources & Death Screen
+
+const resourceTracker = new ResourceTracker();
+game.resourceTracker = resourceTracker;
+
+const deathScreen = new DeathScreen({
+    onRestart: (seed) => {
+        // Reset player state
+        playerHealth.setHp(playerHealth.maxHp);
+        resourceTracker.reset();
+
+        // Clear all active drops from DOM + array
+        for (let i = 0; i < drops.length; i++) {
+            drops[i]._remove && drops[i]._remove();
+        }
+        drops.length = 0;
+
+        // Respawn world with new seed
+        if (typeof game.respawnWithSeed === 'function') {
+            game.respawnWithSeed(seed);
+        }
+
+        // Respawn enemies fresh
+        enemySpawner.clearAll();
+        enemies.length = 0;
+        enemySpawner.setSeed(seed ^ 0xDEAD);
+        enemySpawner.spawnGroups(3, floatingSpawnConfig.bounds).then(spawned => {
+            for (let i = 0; i < spawned.length; i++) enemies.push(spawned[i]);
+            game.enemies = enemies;
+        });
+    }
+});
+game.deathScreen = deathScreen;
+
+const audio = new AudioManager();
+game.audio = audio;
+
+// #endregion
+
 // #region Player Health
 
 const playerHealth = new PlayerHealth({
     maxHp: 100,
     onDeath: () => {
-        console.log('Player died.');
-        // Future: show death screen, respawn logic, etc.
+        audio.playDeath();
+        deathScreen.show(resourceTracker.getAll());
     },
     onDamage: (amount, current, max) => {
         console.log(`Player took ${amount} damage — ${current}/${max} HP remaining.`);
@@ -743,6 +843,9 @@ const enemySpawner = new EnemySpawner(gl, renderer, matScene, scene, {
 });
 
 let enemies = [];
+
+// Active loot drops — ticked every frame, spliced out when collected/expired
+const drops = [];
 
 enemySpawner.spawnGroups(3, floatingSpawnConfig.bounds).then(spawned => {
     enemies = spawned;
@@ -806,6 +909,24 @@ firstPersonHand.inventory = playerInventory;
 game.inventory = playerInventory;
 game.player.inventory = playerInventory;
 
+// ── Audio hooks ──────────────────────────────────────────────────────────
+// Sword: fire sound at the start of every sword swing
+const _origAttackSelected = playerInventory.attackSelected.bind(playerInventory);
+playerInventory.attackSelected = function(onHit) {
+    const started = _origAttackSelected(onHit);
+    if (started) audio.playSword();
+    return started;
+};
+
+// Eating: fire sound when food consumption begins
+const _origStartEating = playerInventory.startEating.bind(playerInventory);
+playerInventory.startEating = function() {
+    const started = _origStartEating();
+    if (started) audio.playEat();
+    return started;
+};
+// ─────────────────────────────────────────────────────────────────────────
+
 // #endregion
 
 // #region Input & Debugging
@@ -866,6 +987,7 @@ function loop(now) {
     firstPersonHand.update(Time.deltaTime);
     playerInventory.update(Time.deltaTime);
     chestSpawner.update(Time.deltaTime);
+    audio.update(cameraController.isWalking);
 
     // ── Enemy update loop ────────────────────────────────────────────────
     if (enemies.length > 0) {
@@ -875,10 +997,20 @@ function loop(now) {
             allEnemies: enemies,
             playerHealth,
             collisionWorld,
-            camera
+            camera,
+            drops
         };
         for (let i = 0; i < enemies.length; i++) {
             enemies[i].update(Time.deltaTime, enemyContext);
+        }
+    }
+
+    // ── Drop update loop ─────────────────────────────────────────────────
+    if (drops.length > 0) {
+        const playerPos = camera.transform.position;
+        for (let i = drops.length - 1; i >= 0; i--) {
+            const done = drops[i].update(Time.deltaTime, playerPos, camera, resourceTracker);
+            if (done) drops.splice(i, 1);
         }
     }
     // ────────────────────────────────────────────────────────────────────
