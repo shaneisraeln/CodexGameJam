@@ -18,7 +18,7 @@ import { PixelArtPass } from './Engine/Rendering/Passes/PixelArtPass.js';
 import { WireframePass } from './Engine/Rendering/Passes/WireframePass.js';
 import { ProfilerInstrumenter } from './Engine/Profiling/Profiler.js';
 import { Editor } from './Editor/Editor.js';
-import { CameraController } from './Engine/Input/CameraController.js';
+import { FirstPersonController } from './FirstPersonController.js';
 import { FloatingObjectSpawner } from './FloatingObjectSpawner.js';
 
 
@@ -347,7 +347,7 @@ function resizeCanvas() {
 
     // 5. Camera aspect ratio should still use the visual aspect
     const aspect = canvas.width / canvas.height;
-    camera.setPerspective(0.8, aspect, 0.1, 1000.0);
+    camera.setPerspective(75 * Math.PI / 180, aspect, 0.1, 1000.0);
 }
 
 window.addEventListener('resize', resizeCanvas);
@@ -358,7 +358,7 @@ resizeCanvas();
 // #region Camera Setup
 
 const aspect = canvas.width / canvas.height;
-camera.setPerspective(0.8, aspect, 0.1, 1000.0);
+camera.setPerspective(75 * Math.PI / 180, aspect, 0.1, 1000.0);
 camera.transform.position.set(-39.2, 1.8, -47);
 camera.transform.rotation.set(0.0, isMobile ? 3.24 : 3.22, 0);
 
@@ -658,7 +658,7 @@ window.floatingObjects = floatingObjects;
 window.landObjects = landObjects;
 window.floatingSpawnConfig = floatingSpawnConfig;
 
-const cameraController = new CameraController(camera, canvas);
+const cameraController = new FirstPersonController(camera, canvas);
 game.cameraController = cameraController;
 
 // #endregion
