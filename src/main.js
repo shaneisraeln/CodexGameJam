@@ -6,6 +6,7 @@ import { Renderer } from './Engine/Rendering/Renderer.js';
 import { Material } from './Engine/Rendering/Material.js';
 import { RenderTarget } from './Engine/Rendering/RenderTarget.js';
 import { GameObject } from './Engine/Core/GameObject.js';
+import { Health } from './Engine/Core/Health.js';
 import { Time } from './Engine/Core/TimeManager.js';
 import { ObjLoader } from './Engine/Loaders/ObjLoader.js';
 import { Texture } from './Engine/Rendering/Texture.js';
@@ -582,6 +583,30 @@ const game = {
     }
 };
 
+const playerHealth = new Health(100);
+game.player = {
+    name: 'Player',
+    health: playerHealth,
+    takeDamage: (amount, source = null) => playerHealth.takeDamage(amount, source),
+    heal: (amount, source = null) => playerHealth.heal(amount, source)
+};
+
+const healthTrack = document.querySelector('.health-track');
+const healthFill = document.getElementById('health-fill');
+const healthValue = document.getElementById('health-value');
+function updatePlayerHealthBar() {
+    const fraction = playerHealth.fraction;
+    const percent = Math.round(fraction * 100);
+    healthFill.style.width = `${percent}%`;
+    healthFill.classList.toggle('is-warning', fraction <= 0.6 && fraction > 0.3);
+    healthFill.classList.toggle('is-critical', fraction <= 0.3);
+    healthValue.textContent = `${Math.ceil(playerHealth.currentHealth)} / ${Math.ceil(playerHealth.maxHealth)}`;
+    healthTrack.setAttribute('aria-valuemax', String(playerHealth.maxHealth));
+    healthTrack.setAttribute('aria-valuenow', String(playerHealth.currentHealth));
+}
+playerHealth.onChange(updatePlayerHealthBar);
+updatePlayerHealthBar();
+
 // #endregion
 
 // #region Game API
@@ -589,6 +614,8 @@ const game = {
 game.setViewports = (mode) => {
     viewports[0].pass = mode; 
 };
+game.damagePlayer = (amount, source = null) => playerHealth.takeDamage(amount, source);
+game.healPlayer = (amount, source = null) => playerHealth.heal(amount, source);
 
 // Floating object spawner control
 game.spawnFloatingObjects = async (count) => {

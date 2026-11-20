@@ -12,7 +12,7 @@ canvas {
 
 #hud {
     position: fixed;
-    top: 8px;
+    top: 78px;
     left: 8px;
     padding: 6px 10px;
     background: rgba(0,0,0,0.5);
@@ -28,7 +28,7 @@ canvas {
 #wip {
     position: fixed;
     top: 8px;
-    left: 120px;
+    left: 270px;
     padding: 6px 10px;
     background: rgba(0,0,0,0.5);
     color: #fff;
@@ -38,4 +38,74 @@ canvas {
     border-radius: 4px;
     z-index: 9999;
     pointer-events: none;
+}
+
+#player-health {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    width: 210px;
+    padding: 9px 11px 11px;
+    color: #fff8d8;
+    background: #34264f;
+    border: 3px solid #171329;
+    border-radius: 13px;
+    box-shadow: 0 4px 0 #171329, inset 0 2px 0 rgba(255, 255, 255, 0.18);
+    font-family: system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-shadow: 1px 2px 0 #171329;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.health-heading {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 6px;
+}
+
+.health-heart {
+    color: #ff6574;
+    font-size: 18px;
+    line-height: 1;
+    text-shadow: 1px 2px 0 #a52f50;
+}
+
+.health-track {
+    position: relative;
+    height: 19px;
+    overflow: hidden;
+    background: #211a35;
+    border: 2px solid #171329;
+    border-radius: 7px;
+    box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.4);
+}
+
+.health-fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #9bed72 0%, #55c968 55%, #329c5d 100%);
+    border-radius: 4px;
+    transition: width 180ms ease, background 180ms ease;
+}
+
+.health-fill.is-warning {
+    background: linear-gradient(180deg, #ffe875 0%, #ffb83f 55%, #e88231 100%);
+}
+
+.health-fill.is-critical {
+    background: linear-gradient(180deg, #ff8590 0%, #f04461 55%, #bf254c 100%);
+}
+
+.health-value {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: white;
+    font-size: 11px;
+    letter-spacing: 0.04em;
 }

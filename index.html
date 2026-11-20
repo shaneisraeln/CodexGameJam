@@ -8,6 +8,13 @@
 </head>
 <body>
     <canvas id="glcanvas"></canvas>
+    <div id="player-health" role="group" aria-label="Player health">
+        <div class="health-heading"><span class="health-heart" aria-hidden="true">&#9829;</span><span>HEALTH</span></div>
+        <div class="health-track" role="progressbar" aria-label="Player health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+            <div id="health-fill" class="health-fill"></div>
+            <span id="health-value" class="health-value">100 / 100</span>
+        </div>
+    </div>
     <script type="module" src="/src/main.js"></script>
     <div id="hud">FPS: --<br>Δ: -- ms</div>
     <div id="wip">Working in Progress</div>

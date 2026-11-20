@@ -166,7 +166,8 @@ export class FirstPersonHand {
         let closestDistance = this.settings.attackReach;
         for (const target of this.scene) {
             if (!target || target === this.gameObject || !target.active) continue;
-            const canTakeDamage = typeof target.takeDamage === 'function' || Number.isFinite(target.health);
+            const canTakeDamage = typeof target.takeDamage === 'function' ||
+                typeof target.health?.takeDamage === 'function' || Number.isFinite(target.health);
             if (!canTakeDamage) continue;
 
             const targetPosition = target.transform.globalPosition;
@@ -200,8 +201,11 @@ export class FirstPersonHand {
     applyDamage(target, amount = this.settings.attackDamage) {
         if (!target || !Number.isFinite(amount) || amount <= 0) return 0;
         if (typeof target.takeDamage === 'function') {
-            target.takeDamage(amount, this.gameObject);
-            return amount;
+            const result = target.takeDamage(amount, this.gameObject);
+            return Number.isFinite(result) ? result : amount;
+        }
+        if (typeof target.health?.takeDamage === 'function') {
+            return target.health.takeDamage(amount, this.gameObject);
         }
         if (Number.isFinite(target.health)) {
             target.health = Math.max(0, target.health - amount);
