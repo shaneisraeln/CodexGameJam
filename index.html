@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PiGL.js</title>
+  <script type="module" crossorigin src="/PiGL.js/static/index-CiyL1nQo.js"></script>
+  <link rel="stylesheet" crossorigin href="/PiGL.js/static/index-CARrcUQ9.css">
+</head>
+
+<body>
+    <canvas id="glcanvas"></canvas>
+    <div id="hud">FPS: --<br>Δ: -- ms</div>
+    <div id="wip">Working in Progress</div>
+
+    <!-- Health Bar HUD -->
+    <div id="health-bar-root">
+        <div id="health-bar-icon">❤</div>
+        <div id="health-bar-track">
+            <div id="health-bar-fill"></div>
+            <div id="health-bar-segments"></div>
+        </div>
+        <span id="health-bar-label">100 / 100</span>
+    </div>
+
+    <!-- Full-screen damage flash overlay -->
+    <div id="damage-flash"></div>
+
+    <!-- Crosshair -->
+    <div id="crosshair"></div>
+
+    <!-- Resource HUD — bottom-left -->
+    <div id="resource-hud">
+        <div class="res-row" id="res-wood-row">
+            <span class="res-icon">🪵</span>
+            <span class="res-name">Wood</span>
+            <span class="res-count" id="res-wood-count">0</span>
+        </div>
+        <div class="res-row" id="res-cloth-row">
+            <span class="res-icon">🧵</span>
+            <span class="res-name">Cloth</span>
+            <span class="res-count" id="res-cloth-count">0</span>
+        </div>
+        <div class="res-row" id="res-metal-row">
+            <span class="res-icon">⚙</span>
+            <span class="res-name">Metal</span>
+            <span class="res-count" id="res-metal-count">0</span>
+        </div>
+    </div>
+
+    <!-- Death Screen -->
+    <div id="death-screen" class="death-hidden">
+        <div id="death-panel">
+            <div id="death-title"></div>
+            <p id="death-subtitle">The island claimed you.</p>
+            <div id="death-divider"></div>
+            <p id="death-label">Resources Gathered</p>
+            <div id="death-stats"></div>
+            <button id="death-restart-btn">⚔ Play Again</button>
+        </div>
+    </div>
+
+    <!-- Inventory Hotbar -->
+    <div id="inventory-root">
+
+        <!-- Held item label -->
+        <div id="inventory-selected">EMPTY HAND</div>
+
+        <!-- Slot row -->
+        <div id="inventory-hotbar">
+
+            <div class="inventory-slot" id="inventory-sword">
+                <div class="inv-slot-key">1</div>
+                <div class="inv-slot-icon">⚔</div>
+                <div class="inv-slot-name">Sword</div>
+                <div class="inventory-count">EMPTY</div>
+            </div>
+
+            <div class="inventory-slot" id="inventory-food">
+                <div class="inv-slot-key">2</div>
+                <div class="inv-slot-icon">🍖</div>
+                <div class="inv-slot-name">Food</div>
+                <div class="inventory-count">EMPTY</div>
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+
+</html>
