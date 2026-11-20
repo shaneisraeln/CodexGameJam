@@ -44,96 +44,86 @@ canvas {
 
 #health-bar-root {
     position: fixed;
-    top: 14px;
-    right: 14px;
+    top: 18px;
+    right: 18px;
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 9px;
     z-index: 9999;
     pointer-events: none;
 
-    /* Pixel-art panel: dark navy with a warm orange border — matches the
-       skybox uTopColor (#222240) and the sunset accent palette */
-    background: rgba(10, 10, 22, 0.72);
-    border: 2px solid rgba(230, 120, 60, 0.55);
-    border-radius: 4px;
-    padding: 5px 10px 5px 8px;
-
-    /* Subtle inner glow so it reads against any sky colour */
+    /* Toon panel — thick dark outline, flat opaque fill */
+    background: #0d0d1a;
+    border: 3px solid #1a0a00;
+    border-radius: 6px;
+    padding: 7px 14px 7px 10px;
     box-shadow:
-        0 0 0 1px rgba(0, 0, 0, 0.6),
-        inset 0 1px 0 rgba(255, 180, 80, 0.08);
+        4px 4px 0px #1a0a00,
+        /* hard toon drop-shadow */
+        inset 0 1px 0 rgba(255, 180, 80, 0.10);
 
-    /* Soft entrance */
-    animation: hb-fadein 0.6s ease both;
+    animation: hb-fadein 0.5s ease both;
 }
 
-/* Heart icon */
 #health-bar-icon {
-    font-size: 15px;
+    font-size: 20px;
     line-height: 1;
-    color: #d94040;
-    text-shadow: 0 0 6px rgba(217, 64, 64, 0.8);
-    /* Gentle beat — slows down when health is fine */
+    color: #e63333;
+    text-shadow:
+        2px 2px 0 #1a0a00,
+        0 0 8px rgba(230, 60, 60, 0.6);
     animation: hb-beat 1.4s ease-in-out infinite;
     flex-shrink: 0;
 }
 
-/* Outer track */
 #health-bar-track {
     position: relative;
-    width: 140px;
-    height: 12px;
-    background: rgba(0, 0, 0, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 2px;
+    width: 170px;
+    height: 16px;
+    background: #0a0612;
+    border: 2px solid #1a0a00;
+    border-radius: 3px;
     overflow: hidden;
-    image-rendering: pixelated;
 }
 
-/* Animated fill — colour is set dynamically by PlayerHealth.js */
 #health-bar-fill {
     height: 100%;
     width: 100%;
-    /* overwritten by JS */
-    background: #7ecf6e;
-    /* default green; JS overrides */
+    background: #5ecb4a;
     border-radius: 1px;
-    transition: width 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-        background-color 0.4s ease;
-    /* Scanline shimmer */
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.30);
+    transition:
+        width 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        background-color 0.35s ease;
+    /* Toon highlight stripe — single hard top line */
+    box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.28);
 }
 
-/* Tick-mark segments drawn with a repeating gradient — 10 divisions */
 #health-bar-segments {
     position: absolute;
     inset: 0;
     background: repeating-linear-gradient(to right,
             transparent 0%,
             transparent calc(10% - 1px),
-            rgba(0, 0, 0, 0.35) calc(10% - 1px),
-            rgba(0, 0, 0, 0.35) 10%);
+            rgba(0, 0, 0, 0.4) calc(10% - 1px),
+            rgba(0, 0, 0, 0.4) 10%);
     pointer-events: none;
 }
 
-/* Numeric label */
 #health-bar-label {
     font-family: monospace;
-    font-size: 11px;
-    color: rgba(255, 220, 180, 0.85);
-    /* warm cream — matches the sunset */
-    letter-spacing: 0.03em;
+    font-size: 13px;
+    font-weight: bold;
+    color: #ffdcb4;
+    text-shadow: 2px 2px 0 #1a0a00;
+    letter-spacing: 0.04em;
     white-space: nowrap;
-    min-width: 48px;
+    min-width: 56px;
     text-align: right;
 }
 
-/* Critical state: pulse the whole widget */
 #health-bar-root.health-critical {
-    border-color: rgba(217, 64, 64, 0.80);
-    animation: hb-fadein 0.6s ease both, hb-critical-pulse 0.9s ease-in-out infinite;
+    border-color: #cc2222;
+    animation: hb-fadein 0.5s ease both, hb-critical-pulse 0.85s ease-in-out infinite;
 }
 
 #health-bar-root.health-critical #health-bar-icon {
@@ -148,22 +138,21 @@ canvas {
     pointer-events: none;
     z-index: 9998;
     opacity: 0;
-    /* Vignette: red bleeds in from screen edges */
     background: radial-gradient(ellipse at center,
-            transparent 55%,
-            rgba(180, 20, 20, 0.70) 100%);
+            transparent 50%,
+            rgba(180, 20, 20, 0.75) 100%);
 }
 
 #damage-flash.damage-flash-active {
     animation: hb-damage-flash 0.45s ease-out forwards;
 }
 
-/* ── Keyframes ──────────────────────────────────────────────────────────── */
+/* ── Health Bar Keyframes ────────────────────────────────────────────────── */
 
 @keyframes hb-fadein {
     from {
         opacity: 0;
-        transform: translateY(-6px);
+        transform: translateY(-8px);
     }
 
     to {
@@ -180,7 +169,7 @@ canvas {
     }
 
     14% {
-        transform: scale(1.25);
+        transform: scale(1.3);
     }
 
     28% {
@@ -188,7 +177,7 @@ canvas {
     }
 
     42% {
-        transform: scale(1.15);
+        transform: scale(1.18);
     }
 
     56% {
@@ -204,7 +193,7 @@ canvas {
     }
 
     50% {
-        transform: scale(1.35);
+        transform: scale(1.4);
     }
 }
 
@@ -212,11 +201,11 @@ canvas {
 
     0%,
     100% {
-        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 180, 80, 0.08);
+        box-shadow: 4px 4px 0 #1a0a00, inset 0 1px 0 rgba(255, 180, 80, 0.10);
     }
 
     50% {
-        box-shadow: 0 0 10px 2px rgba(217, 64, 64, 0.45), inset 0 1px 0 rgba(255, 180, 80, 0.08);
+        box-shadow: 4px 4px 0 #1a0a00, 0 0 14px 3px rgba(220, 40, 40, 0.55), inset 0 1px 0 rgba(255, 180, 80, 0.10);
     }
 }
 
@@ -227,5 +216,296 @@ canvas {
 
     100% {
         opacity: 0;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INVENTORY HOTBAR  — toon style
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#inventory-root {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    z-index: 9999;
+    pointer-events: none;
+    animation: inv-fadein 0.6s ease both;
+}
+
+/* ── Held-item label ─────────────────────────────────────────────────────── */
+
+#inventory-selected {
+    font-family: monospace;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 0.16em;
+    color: #ffdcb4;
+    text-shadow:
+        2px 2px 0 #1a0a00,
+        -1px -1px 0 #1a0a00;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transition: opacity 0.2s ease;
+    /* Toon badge backing */
+    background: #0d0d1a;
+    border: 2px solid #1a0a00;
+    border-radius: 4px;
+    padding: 3px 12px;
+    box-shadow: 3px 3px 0 #1a0a00;
+}
+
+/* ── Hotbar panel ────────────────────────────────────────────────────────── */
+
+#inventory-hotbar {
+    display: flex;
+    gap: 10px;
+    background: #0d0d1a;
+    border: 3px solid #1a0a00;
+    border-radius: 8px;
+    padding: 8px 10px;
+    /* Hard toon shadow */
+    box-shadow: 5px 5px 0 #1a0a00;
+}
+
+/* ── Individual slot ─────────────────────────────────────────────────────── */
+
+.inventory-slot {
+    position: relative;
+    width: 76px;
+    height: 82px;
+    background: #12121f;
+    border: 3px solid #2a1800;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    /* Inner hard shadow for depth */
+    box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.5);
+    transition:
+        border-color 0.12s ease,
+        background 0.12s ease,
+        transform 0.10s ease,
+        box-shadow 0.12s ease;
+}
+
+/* Key badge — top-left */
+.inv-slot-key {
+    position: absolute;
+    top: 4px;
+    left: 6px;
+    font-family: monospace;
+    font-size: 11px;
+    font-weight: bold;
+    color: #e6945a;
+    text-shadow: 1px 1px 0 #1a0a00;
+    line-height: 1;
+}
+
+/* Icon */
+.inv-slot-icon {
+    font-size: 28px;
+    line-height: 1;
+    /* Hard shadow — no blur, toon feel */
+    filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.9));
+    transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+/* Name */
+.inv-slot-name {
+    font-family: monospace;
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    color: #c8a07a;
+    text-shadow: 1px 1px 0 #1a0a00;
+    text-transform: uppercase;
+}
+
+/* Count / status */
+.inventory-count {
+    font-family: monospace;
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: 0.04em;
+    color: #7a6050;
+    text-shadow: 1px 1px 0 #1a0a00;
+    text-transform: uppercase;
+}
+
+/* ── Selected state ──────────────────────────────────────────────────────── */
+
+.inventory-slot.is-selected {
+    background: #221406;
+    border-color: #e6a030;
+    /* Toon glow — hard amber shadow, no soft blur */
+    box-shadow:
+        inset 0 -3px 0 rgba(0, 0, 0, 0.5),
+        0 0 0 2px #e6a030,
+        4px 4px 0 #1a0a00;
+    transform: translateY(-5px);
+}
+
+.inventory-slot.is-selected .inv-slot-key {
+    color: #ffd080;
+    text-shadow: 1px 1px 0 #1a0a00, 0 0 6px rgba(230, 160, 48, 0.7);
+}
+
+.inventory-slot.is-selected .inv-slot-name {
+    color: #ffdcb4;
+}
+
+.inventory-slot.is-selected .inventory-count {
+    color: #ffc060;
+}
+
+.inventory-slot.is-selected .inv-slot-icon {
+    transform: scale(1.18);
+    filter:
+        drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.9)) drop-shadow(0 0 6px rgba(230, 160, 48, 0.65));
+}
+
+/* Bottom accent bar on selected slot */
+.inventory-slot::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 8%;
+    width: 84%;
+    height: 3px;
+    border-radius: 1px;
+    background: transparent;
+    transition: background 0.12s ease;
+}
+
+.inventory-slot.is-selected::after {
+    background: #e6a030;
+    box-shadow: 0 0 6px rgba(230, 160, 48, 0.6);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.inventory-slot.is-empty {
+    opacity: 0.38;
+}
+
+.inventory-slot.is-empty .inv-slot-icon {
+    filter: grayscale(1) brightness(0.5) drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.6));
+}
+
+/* ── Keyframes ───────────────────────────────────────────────────────────── */
+
+@keyframes inv-fadein {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(14px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* ── Crosshair ───────────────────────────────────────────────────────────── */
+
+#crosshair {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.90);
+    /* Toon ink outline */
+    box-shadow:
+        0 0 0 2px rgba(0, 0, 0, 0.75),
+        0 0 6px rgba(0, 0, 0, 0.4);
+    z-index: 9999;
+    pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   POOF & HIT-SPARK PARTICLES
+   All elements are injected by Poof.js and self-remove after their animation.
+   --tx / --ty are set inline per-particle for the outward translate.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Shared base for every particle ─────────────────────────────────────── */
+.poof-dot,
+.poof-star {
+    position: fixed;
+    z-index: 10000;
+    pointer-events: none;
+    /* Centre the element on its spawn point */
+    transform: translate(-50%, -50%);
+    animation-name: poof-particle;
+    animation-timing-function: cubic-bezier(0.22, 0.68, 0, 1.2);
+    animation-fill-mode: forwards;
+    /* duration + delay are set inline by Poof.js */
+}
+
+/* Stars need line-height reset so the ★ glyph centres properly */
+.poof-star {
+    line-height: 1;
+    display: block;
+}
+
+/* ── Particle flight + fade keyframe ─────────────────────────────────────── */
+@keyframes poof-particle {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) translate(0, 0) scale(1);
+    }
+
+    /* Quick pop outward with overshoot */
+    55% {
+        opacity: 1;
+        transform: translate(-50%, -50%) translate(calc(var(--tx) * 1.08), calc(var(--ty) * 1.08)) scale(1.15);
+    }
+
+    /* Settle back slightly then fade */
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) translate(var(--tx), var(--ty)) scale(0.4);
+    }
+}
+
+/* ── Death ring flash ────────────────────────────────────────────────────── */
+.poof-ring {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    /* Centre on spawn point */
+    transform: translate(-50%, -50%);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 3px solid #f5c842;
+    box-shadow: 0 0 0 2px #1a0a00;
+    animation: poof-ring 0.42s cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
+}
+
+@keyframes poof-ring {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(0.5);
+    }
+
+    60% {
+        opacity: 0.8;
+        transform: translate(-50%, -50%) scale(4.5);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(6.5);
     }
 }

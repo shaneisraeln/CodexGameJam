@@ -1,28 +1,75 @@
 // #region Imports
 
-import { Camera } from './Engine/Rendering/Camera.js';
-import { Shader } from './Engine/Rendering/Shader.js';
-import { Renderer } from './Engine/Rendering/Renderer.js';
-import { Material } from './Engine/Rendering/Material.js';
-import { RenderTarget } from './Engine/Rendering/RenderTarget.js';
-import { GameObject } from './Engine/Core/GameObject.js';
-import { Time } from './Engine/Core/TimeManager.js';
-import { ObjLoader } from './Engine/Loaders/ObjLoader.js';
-import { Texture } from './Engine/Rendering/Texture.js';
-import { RenderQueue } from './Engine/Rendering/RenderQueue.js';
-import { CollisionWorld, CollisionLayer } from './Engine/Physics/CollisionWorld.js';
-import { ObjectRenderPass } from './Engine/Rendering/ObjectRenderPass.js';
-import { ViewportPass } from './Engine/Rendering/Passes/ViewportPass.js';
-import { LightingPass } from './Engine/Rendering/Passes/LightingPass.js';
-import { SkyboxPass } from './Engine/Rendering/Passes/SkyboxPass.js';
-import { PixelArtPass } from './Engine/Rendering/Passes/PixelArtPass.js';
-import { WireframePass } from './Engine/Rendering/Passes/WireframePass.js';
-import { ProfilerInstrumenter } from './Engine/Profiling/Profiler.js';
-import { Editor } from './Editor/Editor.js';
-import { FirstPersonController } from './FirstPersonController.js';
-import { FirstPersonHand } from './FirstPersonHand.js';
-import { PlayerInventory } from './PlayerInventory.js';
-import { FloatingObjectSpawner } from './FloatingObjectSpawner.js';
+import {
+    Camera
+} from './Engine/Rendering/Camera.js';
+import {
+    Shader
+} from './Engine/Rendering/Shader.js';
+import {
+    Renderer
+} from './Engine/Rendering/Renderer.js';
+import {
+    Material
+} from './Engine/Rendering/Material.js';
+import {
+    RenderTarget
+} from './Engine/Rendering/RenderTarget.js';
+import {
+    GameObject
+} from './Engine/Core/GameObject.js';
+import {
+    Time
+} from './Engine/Core/TimeManager.js';
+import {
+    ObjLoader
+} from './Engine/Loaders/ObjLoader.js';
+import {
+    Texture
+} from './Engine/Rendering/Texture.js';
+import {
+    RenderQueue
+} from './Engine/Rendering/RenderQueue.js';
+import {
+    CollisionWorld,
+    CollisionLayer
+} from './Engine/Physics/CollisionWorld.js';
+import {
+    ObjectRenderPass
+} from './Engine/Rendering/ObjectRenderPass.js';
+import {
+    ViewportPass
+} from './Engine/Rendering/Passes/ViewportPass.js';
+import {
+    LightingPass
+} from './Engine/Rendering/Passes/LightingPass.js';
+import {
+    SkyboxPass
+} from './Engine/Rendering/Passes/SkyboxPass.js';
+import {
+    PixelArtPass
+} from './Engine/Rendering/Passes/PixelArtPass.js';
+import {
+    WireframePass
+} from './Engine/Rendering/Passes/WireframePass.js';
+import {
+    ProfilerInstrumenter
+} from './Engine/Profiling/Profiler.js';
+import {
+    Editor
+} from './Editor/Editor.js';
+import {
+    FirstPersonController
+} from './FirstPersonController.js';
+import {
+    FirstPersonHand
+} from './FirstPersonHand.js';
+import {
+    PlayerInventory
+} from './PlayerInventory.js';
+import {
+    FloatingObjectSpawner
+} from './FloatingObjectSpawner.js';
 
 
 // Shader imports
@@ -54,6 +101,9 @@ import {
 import {
     EnemySpawner
 } from './Enemies/EnemySpawner.js';
+import {
+    Poof
+} from './Enemies/Poof.js';
 
 // #endregion
 
@@ -758,10 +808,29 @@ game.cameraController = cameraController;
 const firstPersonHand = new FirstPersonHand(gl, renderer, shaderMain, camera, scene, {
     controller: cameraController,
     inputElement: canvas,
-    onEatFood: (healAmount) => game.healPlayer(healAmount)
+    onEatFood: (healAmount) => game.healPlayer(healAmount),
+    attackDamage: 25,
+    attackReach: 3.2,
+    attackRadius: 0.9
 });
 game.firstPersonHand = firstPersonHand;
 game.attack = () => firstPersonHand.attack();
+
+// ── Patch applyDamage so enemies receive fromPos + camera for knockback/poof ──
+const _origApplyDamage = firstPersonHand.applyDamage.bind(firstPersonHand);
+firstPersonHand.applyDamage = function(target, amount) {
+    if (amount === undefined) amount = firstPersonHand.settings.attackDamage;
+    // Enemy.takeDamage(amount, fromPos, camera)
+    if (target && typeof target.takeDamage === 'function' && target.hitRadius !== undefined) {
+        const result = target.takeDamage(amount, camera.transform.position, camera);
+        // Spawn hit spark if the enemy survived (poof handles death separately)
+        if (result > 0 && !target.isDead) {
+            Poof.spawnHit(target.transform.position, camera);
+        }
+        return typeof result === 'number' ? result : amount;
+    }
+    return _origApplyDamage(target, amount);
+};
 const playerInventory = new PlayerInventory(gl, renderer, shaderMain, camera, scene, {
     hand: firstPersonHand,
     controller: cameraController
@@ -837,7 +906,8 @@ function loop(now) {
             playerPosition: playerPos,
             allEnemies: enemies,
             playerHealth,
-            collisionWorld
+            collisionWorld,
+            camera
         };
         for (let i = 0; i < enemies.length; i++) {
             enemies[i].update(Time.deltaTime, enemyContext);

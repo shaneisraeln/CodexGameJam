@@ -4,9 +4,12 @@ import {
 import {
     CollisionLayer
 } from '../Engine/Physics/CollisionWorld.js';
+import {
+    Poof
+} from './Poof.js';
 import CONTINENT from '../CustomMapNoise.js';
 
-// ── Terrain constants (must match main.js / FirstPersonController) ──────────
+// ── Terrain constants (must match main.js / FirstPersonController) ────────
 var TERRAIN_OFFSET_X = -(255 * Math.sqrt(3) / 2);
 var TERRAIN_OFFSET_Z = -(255 * 1.5 / 2);
 var TERRAIN_SCALE_Y = 0.4;
@@ -22,49 +25,40 @@ function getGroundHeight(x, z) {
     return h;
 }
 
-// ── Tuning ───────────────────────────────────────────────────────────────────
-var TURN_SPEED = Math.PI * 1.8; // rad/s
-var WANDER_CHANGE_MIN = 1.5; // seconds
+// ── Tuning ────────────────────────────────────────────────────────────────
+var TURN_SPEED = Math.PI * 1.8;
+var WANDER_CHANGE_MIN = 1.5;
 var WANDER_CHANGE_MAX = 4.0;
 var WANDER_TURN_MAX = Math.PI * 0.6;
 var STEP_HEIGHT = 3.5;
-var ENEMY_RADIUS = 0.55; // collision circle radius (world units)
-var ENEMY_HEIGHT = 2.2; // approx capsule height
+var ENEMY_RADIUS = 0.55;
+var ENEMY_HEIGHT = 2.2;
 
-var CULL_DIST = 90; // AI completely frozen beyond this
+var CULL_DIST = 90;
 var CULL_DIST_SQ = CULL_DIST * CULL_DIST;
 
-var CHASE_START_DIST = 14; // detection range
-var CHASE_GIVE_UP_DIST = 35; // start counting give-up timer at this distance
+var CHASE_START_DIST = 14;
+var CHASE_GIVE_UP_DIST = 35;
 var CHASE_GIVE_UP_SQ = CHASE_GIVE_UP_DIST * CHASE_GIVE_UP_DIST;
-var CHASE_GIVE_UP_TIME = 4.0; // seconds at give-up distance before returning to wander
+var CHASE_GIVE_UP_TIME = 4.0;
 
-var ATTACK_COOLDOWN = 1.2; // seconds between damage ticks
+var ATTACK_COOLDOWN = 1.2;
 
-/**
- * Enemy — hostile NPC with terrain-hugging movement and collision.
- *
- * Collision integration:
- *   - Each enemy owns a dynamic circle collider on the NPC layer.
- *   - After every move step, resolveCircle() pushes it out of WORLD objects
- *     and other NPC colliders so enemies can't stack or phase through scenery.
- *   - The player's resolveCircle already queries NPC layer (mask 0xffffffff),
- *     so the player is naturally blocked by enemies too.
- *
- * Chase / give-up:
- *   - Chase starts when player enters detectionRange.
- *   - Receiving damage also triggers chase regardless of distance.
- *   - Give-up requires the player to stay beyond CHASE_GIVE_UP_DIST for
- *     CHASE_GIVE_UP_TIME seconds continuously — a brief sprint away won't
- *     shake them off.
- */
+// Knockback
+var KNOCKBACK_FRICTION = 8.0; // higher = stops faster (exponential decay)
+var KNOCKBACK_MAX_SPEED = 18.0; // clamp so a hit can't teleport the enemy
+
+// Hit-flash
+var HIT_FLASH_DURATION = 0.18; // seconds the scale-pop lasts
+var HIT_SCALE_PEAK = 1.35; // scale multiplier at peak of flash
+
 export class Enemy extends GameObject {
     constructor(renderer, material, mesh, name, options) {
         if (name === undefined) name = 'Enemy';
         if (options === undefined) options = {};
         super(renderer, material, mesh, name);
 
-        // ── Stats ────────────────────────────────────────────────────────
+        // ── Stats ──────────────────────────────────────────────────────
         this.maxHp = options.maxHp !== undefined ? options.maxHp : 50;
         this.hp = this.maxHp;
         this.damage = options.damage !== undefined ? options.damage : 10;
@@ -73,46 +67,99 @@ export class Enemy extends GameObject {
         this.detectionRange = options.detectionRange !== undefined ? options.detectionRange : CHASE_START_DIST;
         this.attackRange = options.attackRange !== undefined ? options.attackRange : 1.8;
 
-        // ── State ────────────────────────────────────────────────────────
+        // hitRadius — world-space hit sphere for FirstPersonHand ray-sphere test.
+        // Enemy scale is 3× in EnemySpawner, so we set this in world-space units directly.
+        this.hitRadius = options.hitRadius !== undefined ? options.hitRadius : 2.0;
+
+        // ── State ──────────────────────────────────────────────────────
         this.state = 'wander';
         this.isDead = false;
         this._stateTime = 0;
 
-        // ── Movement ─────────────────────────────────────────────────────
+        // ── Movement ───────────────────────────────────────────────────
         this.heading = Math.random() * Math.PI * 2;
         this._targetHeading = this.heading;
         this._wanderTimer = WANDER_CHANGE_MIN + Math.random() * (WANDER_CHANGE_MAX - WANDER_CHANGE_MIN);
 
-        // ── Chase give-up ─────────────────────────────────────────────────
-        this._giveUpTimer = 0; // accumulates while player is far
+        // ── Knockback ──────────────────────────────────────────────────
+        // Velocity impulse (world units/s) applied by takeDamage,
+        // decays exponentially each frame via KNOCKBACK_FRICTION.
+        this._knockbackX = 0;
+        this._knockbackZ = 0;
 
-        // ── Attack ───────────────────────────────────────────────────────
+        // ── Hit flash ──────────────────────────────────────────────────
+        this._hitFlashTimer = 0; // counts down from HIT_FLASH_DURATION
+        this._baseScaleX = null; // set on first update
+        this._baseScaleY = null;
+        this._baseScaleZ = null;
+
+        // ── Chase give-up ──────────────────────────────────────────────
+        this._giveUpTimer = 0;
+
+        // ── Attack ─────────────────────────────────────────────────────
         this._attackTimer = 0;
 
-        // ── Collision ────────────────────────────────────────────────────
-        this.collider = null; // set by EnemySpawner after addCircle()
+        // ── Collision ──────────────────────────────────────────────────
+        this.collider = null;
         this.groupId = -1;
     }
 
-    // ── Public ────────────────────────────────────────────────────────────
+    // ── Public API ────────────────────────────────────────────────────────
 
-    takeDamage(amount) {
-        if (this.isDead) return false;
+    /**
+     * Receive a sword hit.
+     * @param {number} amount   Damage dealt.
+     * @param {{x,y,z}} fromPos  World position the hit came from (for knockback direction).
+     * @param {Camera}  camera   Needed by Poof to project death position.
+     * @returns {number}  Actual damage applied (0 if already dead).
+     */
+    takeDamage(amount, fromPos, camera) {
+        if (this.isDead) return 0;
+
+        // ── Apply damage ───────────────────────────────────────────────
+        var prev = this.hp;
         this.hp = Math.max(0, this.hp - amount);
-        if (this.state === 'wander') this._setState('chase');
-        if (this.hp === 0) {
-            this._die();
-            return true;
+        var applied = prev - this.hp;
+
+        // ── Knockback impulse ──────────────────────────────────────────
+        if (fromPos) {
+            var dx = this.transform.position.x - fromPos.x;
+            var dz = this.transform.position.z - fromPos.z;
+            var len = Math.sqrt(dx * dx + dz * dz);
+            if (len < 0.001) {
+                dx = 1;
+                dz = 0;
+                len = 1;
+            }
+            var force = Math.min(amount * 0.55, KNOCKBACK_MAX_SPEED);
+            this._knockbackX = (dx / len) * force;
+            this._knockbackZ = (dz / len) * force;
         }
-        return false;
+
+        // ── Hit flash ──────────────────────────────────────────────────
+        this._hitFlashTimer = HIT_FLASH_DURATION;
+
+        // ── Aggro — always chase whoever hit us ────────────────────────
+        if (this.state === 'wander') this._setState('chase');
+        this._giveUpTimer = 0; // reset give-up regardless of distance
+
+        // ── Death ──────────────────────────────────────────────────────
+        if (this.hp === 0) {
+            this._die(camera);
+            return applied;
+        }
+
+        return applied;
     }
 
     /**
+     * Per-frame update.
      * @param {number} dt
      * @param {{
      *   playerPosition: {x,y,z},
      *   playerHealth,
      *   collisionWorld,
+     *   camera,
      *   allEnemies: Enemy[]
      * }} context
      */
@@ -120,9 +167,16 @@ export class Enemy extends GameObject {
         if (context === undefined) context = {};
         if (this.isDead) return;
 
+        // Store base scale on first frame (set by EnemySpawner)
+        if (this._baseScaleX === null) {
+            this._baseScaleX = this.transform.scale.x;
+            this._baseScaleY = this.transform.scale.y;
+            this._baseScaleZ = this.transform.scale.z;
+        }
+
         var pp = context.playerPosition;
 
-        // ── Distance cull — freeze AI entirely beyond CULL_DIST ──────────
+        // ── Distance cull ──────────────────────────────────────────────
         if (pp) {
             var dxC = this.transform.position.x - pp.x;
             var dzC = this.transform.position.z - pp.z;
@@ -134,11 +188,59 @@ export class Enemy extends GameObject {
 
         this._stateTime += dt;
 
+        // ── Hit flash (scale pop) ──────────────────────────────────────
+        if (this._hitFlashTimer > 0) {
+            this._hitFlashTimer -= dt;
+            if (this._hitFlashTimer < 0) this._hitFlashTimer = 0;
+
+            // Smooth bell-curve: peaks at mid-flash, returns to 1 at end
+            var flashProgress = 1.0 - (this._hitFlashTimer / HIT_FLASH_DURATION);
+            var flashScale = 1.0 + (HIT_SCALE_PEAK - 1.0) * Math.sin(flashProgress * Math.PI);
+            this.transform.scale.set(
+                this._baseScaleX * flashScale,
+                this._baseScaleY * flashScale,
+                this._baseScaleZ * flashScale
+            );
+        } else {
+            // Ensure scale is restored precisely when flash ends
+            this.transform.scale.set(this._baseScaleX, this._baseScaleY, this._baseScaleZ);
+        }
+
+        // ── Knockback decay ────────────────────────────────────────────
+        var hasKnockback = Math.abs(this._knockbackX) > 0.01 || Math.abs(this._knockbackZ) > 0.01;
+        if (hasKnockback) {
+            var decay = Math.exp(-KNOCKBACK_FRICTION * dt);
+            this._knockbackX *= decay;
+            this._knockbackZ *= decay;
+
+            var kpos = this.transform.position;
+            var knewX = kpos.x + this._knockbackX * dt;
+            var knewZ = kpos.z + this._knockbackZ * dt;
+
+            // Terrain confinement for knockback too
+            var kgx = getGroundHeight(knewX, kpos.z);
+            if (kgx !== null) kpos.x = knewX;
+            var kgz = getGroundHeight(kpos.x, knewZ);
+            if (kgz !== null) kpos.z = knewZ;
+
+            // Snap Y
+            var kg = getGroundHeight(kpos.x, kpos.z);
+            if (kg !== null) kpos.y = kg;
+
+            // Sync collider
+            if (this.collider && context.collisionWorld) {
+                context.collisionWorld.update(
+                    this.collider, kpos.x, kpos.y, kpos.z
+                );
+            }
+        }
+
+        // ── AI states ──────────────────────────────────────────────────
         if (this.state === 'wander') this._updateWander(dt, context);
         else if (this.state === 'chase') this._updateChase(dt, context);
         else if (this.state === 'attack') this._updateAttack(dt, context);
 
-        // ── Sync dynamic collider position ───────────────────────────────
+        // ── Sync collider ──────────────────────────────────────────────
         if (this.collider && context.collisionWorld) {
             context.collisionWorld.update(
                 this.collider,
@@ -153,7 +255,6 @@ export class Enemy extends GameObject {
 
     _updateWander(dt, context) {
         var pp = context.playerPosition;
-
         if (pp) {
             var dx = pp.x - this.transform.position.x;
             var dz = pp.z - this.transform.position.z;
@@ -168,7 +269,6 @@ export class Enemy extends GameObject {
             this._wanderTimer = WANDER_CHANGE_MIN + Math.random() * (WANDER_CHANGE_MAX - WANDER_CHANGE_MIN);
             this._targetHeading = this.heading + (Math.random() - 0.5) * 2 * WANDER_TURN_MAX;
         }
-
         this._moveForward(dt, this.moveSpeed, context);
     }
 
@@ -183,7 +283,6 @@ export class Enemy extends GameObject {
         var dz = pp.z - this.transform.position.z;
         var distSq = dx * dx + dz * dz;
 
-        // Accumulate give-up timer only while player stays far away
         if (distSq > CHASE_GIVE_UP_SQ) {
             this._giveUpTimer += dt;
             if (this._giveUpTimer >= CHASE_GIVE_UP_TIME) {
@@ -192,10 +291,9 @@ export class Enemy extends GameObject {
                 return;
             }
         } else {
-            this._giveUpTimer = 0; // reset the moment player comes back closer
+            this._giveUpTimer = 0;
         }
 
-        // Switch to attack when close enough
         if (distSq <= this.attackRange * this.attackRange) {
             this._setState('attack');
             return;
@@ -216,18 +314,15 @@ export class Enemy extends GameObject {
         var dz = pp.z - this.transform.position.z;
         var distSq = dx * dx + dz * dz;
 
-        // Player backed away — resume chase
         if (distSq > this.attackRange * this.attackRange * 1.6) {
             this._setState('chase');
             return;
         }
 
-        // Face player
         this._targetHeading = Math.atan2(dx, dz);
         this._smoothTurn(dt);
         this.transform.rotation.y = this.heading;
 
-        // Damage tick (future: replace with sword-swing animation gate)
         this._attackTimer += dt;
         if (this._attackTimer >= ATTACK_COOLDOWN) {
             this._attackTimer = 0;
@@ -247,7 +342,6 @@ export class Enemy extends GameObject {
         var dx = Math.sin(this.heading) * step;
         var dz = Math.cos(this.heading) * step;
 
-        // Terrain confinement — resolve X and Z axes independently (coast slide)
         var newX = pos.x;
         var newZ = pos.z;
 
@@ -265,11 +359,9 @@ export class Enemy extends GameObject {
             this._targetHeading = this.heading + Math.PI * (0.4 + Math.random() * 0.4);
         }
 
-        // Collision resolution — push out of world objects AND other enemies
         if (context.collisionWorld && this.collider) {
             var floor = pos.y - ENEMY_HEIGHT * 0.5;
             var ceil = pos.y + ENEMY_HEIGHT;
-
             var resolved = context.collisionWorld.resolveCircle(
                 newX, newZ, ENEMY_RADIUS, {
                     minY: floor,
@@ -286,7 +378,6 @@ export class Enemy extends GameObject {
         pos.x = newX;
         pos.z = newZ;
 
-        // Snap Y to terrain surface
         var ground = getGroundHeight(pos.x, pos.z);
         if (ground !== null) pos.y = ground;
 
@@ -313,14 +404,23 @@ export class Enemy extends GameObject {
         if (this.state === s) return;
         this.state = s;
         this._stateTime = 0;
-        if (s === 'attack') this._attackTimer = ATTACK_COOLDOWN; // first hit lands quickly
+        if (s === 'attack') this._attackTimer = ATTACK_COOLDOWN;
         if (s === 'wander') this._giveUpTimer = 0;
     }
 
-    _die() {
+    _die(camera) {
         this.isDead = true;
         this.state = 'dead';
         this.active = false;
-        // Collider stays registered but active=false makes resolveCircle skip it
+
+        // Poof at chest height (Y + 1 world unit above feet)
+        if (camera) {
+            var poofPos = {
+                x: this.transform.position.x,
+                y: this.transform.position.y + 1.0,
+                z: this.transform.position.z
+            };
+            Poof.spawn(poofPos, camera);
+        }
     }
 }
