@@ -7,7 +7,13 @@ import {
 import {
     Poof
 } from './Poof.js';
+import {
+    EnemyDrop
+} from './EnemyDrop.js';
 import CONTINENT from '../CustomMapNoise.js';
+
+// Resource types enemies can drop — wood is most common
+var DROP_RESOURCES = ['wood', 'wood', 'wood', 'cloth', 'cloth', 'metal'];
 
 // ── Terrain constants (must match main.js / FirstPersonController) ────────
 var TERRAIN_OFFSET_X = -(255 * Math.sqrt(3) / 2);
@@ -102,6 +108,8 @@ export class Enemy extends GameObject {
         // ── Collision ──────────────────────────────────────────────────
         this.collider = null;
         this.groupId = -1;
+        // Stored each update() so takeDamage (called from outside) can spawn drops
+        this._lastContext = null;
     }
 
     // ── Public API ────────────────────────────────────────────────────────
@@ -145,7 +153,7 @@ export class Enemy extends GameObject {
 
         // ── Death ──────────────────────────────────────────────────────
         if (this.hp === 0) {
-            this._die(camera);
+            this._die(camera, this._lastContext);
             return applied;
         }
 
@@ -166,6 +174,9 @@ export class Enemy extends GameObject {
     update(dt, context) {
         if (context === undefined) context = {};
         if (this.isDead) return;
+
+        // Cache context so takeDamage() can access drops array even when called externally
+        this._lastContext = context;
 
         // Store base scale on first frame (set by EnemySpawner)
         if (this._baseScaleX === null) {
@@ -408,12 +419,12 @@ export class Enemy extends GameObject {
         if (s === 'wander') this._giveUpTimer = 0;
     }
 
-    _die(camera) {
+    _die(camera, context) {
         this.isDead = true;
         this.state = 'dead';
         this.active = false;
 
-        // Poof at chest height (Y + 1 world unit above feet)
+        // Poof at chest height
         if (camera) {
             var poofPos = {
                 x: this.transform.position.x,
@@ -421,6 +432,21 @@ export class Enemy extends GameObject {
                 z: this.transform.position.z
             };
             Poof.spawn(poofPos, camera);
+        }
+
+        // Spawn 1–3 resource drops
+        var dropCount = 1 + Math.floor(Math.random() * 3);
+        var spawnPos = {
+            x: this.transform.position.x,
+            y: this.transform.position.y,
+            z: this.transform.position.z
+        };
+        for (var i = 0; i < dropCount; i++) {
+            var resourceType = DROP_RESOURCES[Math.floor(Math.random() * DROP_RESOURCES.length)];
+            var drop = new EnemyDrop(spawnPos, resourceType, 1);
+            if (context && context.drops) {
+                context.drops.push(drop);
+            }
         }
     }
 }

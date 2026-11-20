@@ -30,6 +30,37 @@
     <!-- Crosshair -->
     <div id="crosshair"></div>
 
+    <!-- Resource HUD — bottom-left -->
+    <div id="resource-hud">
+        <div class="res-row" id="res-wood-row">
+            <span class="res-icon">🪵</span>
+            <span class="res-name">Wood</span>
+            <span class="res-count" id="res-wood-count">0</span>
+        </div>
+        <div class="res-row" id="res-cloth-row">
+            <span class="res-icon">🧵</span>
+            <span class="res-name">Cloth</span>
+            <span class="res-count" id="res-cloth-count">0</span>
+        </div>
+        <div class="res-row" id="res-metal-row">
+            <span class="res-icon">⚙</span>
+            <span class="res-name">Metal</span>
+            <span class="res-count" id="res-metal-count">0</span>
+        </div>
+    </div>
+
+    <!-- Death Screen -->
+    <div id="death-screen" class="death-hidden">
+        <div id="death-panel">
+            <div id="death-title"></div>
+            <p id="death-subtitle">The island claimed you.</p>
+            <div id="death-divider"></div>
+            <p id="death-label">Resources Gathered</p>
+            <div id="death-stats"></div>
+            <button id="death-restart-btn">⚔ Play Again</button>
+        </div>
+    </div>
+
     <!-- Inventory Hotbar -->
     <div id="inventory-root">
 
