@@ -22,6 +22,7 @@ import { Editor } from './Editor/Editor.js';
 import { FirstPersonController } from './FirstPersonController.js';
 import { FirstPersonHand } from './FirstPersonHand.js';
 import { PlayerInventory } from './PlayerInventory.js';
+import { ChestSpawner } from './ChestSpawner.js';
 import { FloatingObjectSpawner } from './FloatingObjectSpawner.js';
 
 
