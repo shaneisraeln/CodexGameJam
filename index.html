@@ -14,6 +14,31 @@
     <div id="hud">FPS: --<br>Δ: -- ms</div>
     <div id="wip">Working in Progress</div>
 
+    <div id="story-overlay" class="story-visible story-intro">
+        <div class="story-card">
+            <p class="story-kicker">A CASTAWAY STORY</p>
+            <h1 id="story-title">SURVIVE &amp; ESCAPE</h1>
+            <p id="story-subtitle">Stranded on an island. Find a way home.</p>
+            <span class="story-skip">PRESS SPACE OR ENTER TO SKIP</span>
+        </div>
+    </div>
+
+    <div id="story-objective">
+        <strong>REPAIR THE WRECK</strong>
+        <span>Defeat enemies, collect 4 resources, then repair the wreck.</span>
+    </div>
+    <div id="repair-prompt"></div>
+    <div id="repair-progress"><div id="repair-progress-fill"></div></div>
+
+    <div id="win-screen">
+        <div class="story-card win-card">
+            <p class="story-kicker">YOU MADE IT</p>
+            <h1>ISLAND ESCAPED!</h1>
+            <p>Your ship carries you toward the open sea.</p>
+            <button id="win-restart-btn">PLAY AGAIN</button>
+        </div>
+    </div>
+
     <!-- Health Bar HUD -->
     <div id="health-bar-root">
         <div id="health-bar-icon">❤</div>

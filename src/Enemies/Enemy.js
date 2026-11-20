@@ -434,8 +434,8 @@ export class Enemy extends GameObject {
             Poof.spawn(poofPos, camera);
         }
 
-        // Spawn 1–3 resource drops
-        var dropCount = 1 + Math.floor(Math.random() * 3);
+        // Drop a small resource bundle so the escape repair objective remains achievable.
+        var dropCount = 2 + Math.floor(Math.random() * 2);
         var spawnPos = {
             x: this.transform.position.x,
             y: this.transform.position.y,

@@ -89,6 +89,9 @@ export class FirstPersonHand {
             this.camera.transform.add(hand.transform);
             this.scene.push(hand);
             this.gameObject = hand;
+            // Inventory may have selected an item before this async model load
+            // finished, so immediately apply the current hand/item visibility.
+            this.inventory?._updateItemVisibility();
             return hand;
         } catch (error) {
             console.error('Could not load first-person hand:', error);

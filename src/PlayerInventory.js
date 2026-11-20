@@ -244,6 +244,9 @@ export class PlayerInventory {
     }
 
     update(dt) {
+        // Reconcile visibility every frame so cutscene transitions cannot reveal
+        // the bare hand over a selected sword or food item.
+        this._updateItemVisibility();
         const frameTime = Math.min(Math.max(dt, 0), 0.05);
         const bobBlend = 1 - Math.exp(-this.settings.itemBobSmoothing * frameTime);
         const bobTarget = this.controller?.isWalking ? 1 : 0;

@@ -18,7 +18,6 @@ import { SkyboxPass } from './Engine/Rendering/Passes/SkyboxPass.js';
 import { PixelArtPass } from './Engine/Rendering/Passes/PixelArtPass.js';
 import { WireframePass } from './Engine/Rendering/Passes/WireframePass.js';
 import { ProfilerInstrumenter } from './Engine/Profiling/Profiler.js';
-import { Editor } from './Editor/Editor.js';
 import { FirstPersonController } from './FirstPersonController.js';
 import { FirstPersonHand } from './FirstPersonHand.js';
 import { PlayerInventory } from './PlayerInventory.js';
@@ -68,6 +67,7 @@ import {
 import {
     AudioManager
 } from './AudioManager.js';
+import { StoryFlow } from './StoryFlow.js';
 
 // #endregion
 
@@ -290,7 +290,7 @@ matBuoyancy.setUniforms({
     'uRoughness': 1.0
 });
 
-// Register Materials for Editor
+// Register materials used by the game systems.
 const materials = {
     'Lighting': matLighting,
     'Skybox': matSkybox,
@@ -477,6 +477,7 @@ const floatingSpawnConfig = {
     },
     yFixed: -6.25
 };
+const shipRepairCost = { total: 4 };
 
 const grassBatchSpawner = new GrassBatchSpawner(gl, renderer, matGrassWave, scene, {
     density: 0.03,
@@ -733,12 +734,7 @@ game.respawnWithSeed = (seed) => {
 
 let profiler = null;
 
-if (!isMobile) {
-    const editor = new Editor(game);
-    game.editor = editor;
-    profiler = ProfilerInstrumenter.attach(renderQueue, renderer, game);
-    game.profiler = profiler;
-}
+// The in-game editor is disabled for the story build.
 
 // #region Resources & Death Screen
 
@@ -765,8 +761,10 @@ const deathScreen = new DeathScreen({
         // Respawn enemies fresh
         enemySpawner.clearAll();
         enemies.length = 0;
+        storyFlow.restart();
+        wreckObject?.transform.position.set(wreckPosition.x, wreckGroundY, wreckPosition.z);
         enemySpawner.setSeed(seed ^ 0xDEAD);
-        enemySpawner.spawnGroups(3, floatingSpawnConfig.bounds).then(spawned => {
+        enemySpawner.spawnGroups(1, floatingSpawnConfig.bounds).then(spawned => {
             for (let i = 0; i < spawned.length; i++) enemies.push(spawned[i]);
             game.enemies = enemies;
         });
@@ -809,7 +807,15 @@ game.healPlayer = (amount) => playerHealth.heal(amount);
 const enemySpawner = new EnemySpawner(gl, renderer, matScene, scene, {
     seed: floatingSpawnConfig.seed,
     minNoiseValue: 0.42,
-    collisionWorld
+    collisionWorld,
+    enemyDefaults: {
+        maxHp: 50,
+        damage: 10,
+        moveSpeed: 3.2,
+        chaseSpeed: 4.5,
+        detectionRange: 80,
+        attackRange: 1.8
+    }
 });
 
 let enemies = [];
@@ -817,10 +823,10 @@ let enemies = [];
 // Active loot drops — ticked every frame, spliced out when collected/expired
 const drops = [];
 
-enemySpawner.spawnGroups(3, floatingSpawnConfig.bounds).then(spawned => {
+enemySpawner.spawnGroups(1, floatingSpawnConfig.bounds).then(spawned => {
     enemies = spawned;
     game.enemies = enemies; // keep game object in sync
-    console.log(`[Enemies] Spawned ${spawned.length} enemies in 3 groups.`);
+    console.log(`[Enemies] Spawned ${spawned.length} enemies for the escape story.`);
 });
 
 game.enemySpawner = enemySpawner;
@@ -879,6 +885,36 @@ firstPersonHand.inventory = playerInventory;
 game.inventory = playerInventory;
 game.player.inventory = playerInventory;
 
+const wreckSpawner = new LandObjectSpawner(gl, renderer, matScene, scene, ['ship-wreck.obj'], {
+    threshold: 0.45,
+    collisionWorld
+});
+const wreckPosition = { x: -46.5, y: -11, z: -47 };
+const wreckRawValue = CONTINENT.getValue(
+    wreckPosition.x - (-(255 * Math.sqrt(3) / 2)),
+    wreckPosition.z - (-(255 * 1.5 / 2)),
+    0
+);
+const wreckGroundY = -11 + HexGridMesh.terrainValue(wreckRawValue) * 20 * 0.4;
+const wreckObject = await wreckSpawner.spawnRandomObject(wreckPosition, wreckRawValue, 0);
+if (wreckObject) {
+    wreckObject.name = 'Ship Wreck [Objective]';
+    wreckObject.transform.position.set(wreckPosition.x, wreckGroundY, wreckPosition.z);
+    wreckObject.transform.scale.set(1.8, 1.8, 1.8);
+    wreckObject.repaired = false;
+}
+const storyFlow = new StoryFlow({
+    camera,
+    controller: cameraController,
+    wreck: wreckObject,
+    enemies: () => enemies,
+    resources: resourceTracker,
+    required: shipRepairCost
+});
+game.story = storyFlow;
+game.shipRepairCost = shipRepairCost;
+document.getElementById('win-restart-btn')?.addEventListener('click', () => window.location.reload());
+
 // ── Audio hooks ──────────────────────────────────────────────────────────
 // Sword: fire sound at the start of every sword swing
 const _origAttackSelected = playerInventory.attackSelected.bind(playerInventory);
@@ -913,20 +949,6 @@ window.addEventListener('keydown', (e) => {
             game.respawnWithSeed(randomSeed);
         }
 
-        // If editor WorldWindow is available, update its displayed seed
-        try {
-            if (game.editor && game.editor.windows && game.editor.windows.world) {
-                const ww = game.editor.windows.world;
-                if (ww && ww.state) {
-                    ww.state.seed = randomSeed;
-                    if (ww.seedController && typeof ww.seedController.updateDisplay === 'function') {
-                        ww.seedController.updateDisplay();
-                    }
-                }
-            }
-        } catch (err) {
-            console.warn('Failed to update WorldWindow seed UI', err);
-        }
     }
 });
 
@@ -953,14 +975,19 @@ function loop(now) {
     Time.update(now);
     game.deltaTime = Time.deltaTime;
 
-    cameraController.update(Time.deltaTime);
+    if (storyFlow.phase === 'gameplay' || storyFlow.phase === 'repairing') {
+        cameraController.update(Time.deltaTime);
+    } else if (storyFlow.phase === 'intro' || storyFlow.phase === 'sailing') {
+        cameraController.keys.clear();
+    }
+    storyFlow.update(Time.deltaTime);
     firstPersonHand.update(Time.deltaTime);
     playerInventory.update(Time.deltaTime);
     chestSpawner.update(Time.deltaTime);
     audio.update(cameraController.isWalking);
 
     // ── Enemy update loop ────────────────────────────────────────────────
-    if (enemies.length > 0) {
+    if ((storyFlow.phase === 'gameplay' || storyFlow.phase === 'repairing') && enemies.length > 0) {
         const playerPos = camera.transform.position;
         const enemyContext = {
             playerPosition: playerPos,
@@ -976,7 +1003,7 @@ function loop(now) {
     }
 
     // ── Drop update loop ─────────────────────────────────────────────────
-    if (drops.length > 0) {
+    if ((storyFlow.phase === 'gameplay' || storyFlow.phase === 'repairing') && drops.length > 0) {
         const playerPos = camera.transform.position;
         for (let i = drops.length - 1; i >= 0; i--) {
             const done = drops[i].update(Time.deltaTime, playerPos, camera, resourceTracker);

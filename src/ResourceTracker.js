@@ -42,6 +42,15 @@ export class ResourceTracker {
         this._notify(type, amount);
     }
 
+    /** Spend a resource only when the full requested amount is available. */
+    removeResource(type, amount) {
+        if (!(type in this._counts) || amount <= 0 || this._counts[type] < amount) return false;
+        this._counts[type] -= amount;
+        this._render();
+        this._notify(type, -amount);
+        return true;
+    }
+
     /** Get current count for a resource type. */
     get(type) {
         return this._counts[type] || 0;
