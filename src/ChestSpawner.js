@@ -18,6 +18,8 @@ export class ChestSpawner {
         this.mesh = null;
         this.chests = [];
         this.openDuration = 0.9;
+        this.bounceDuration = 0.42;
+        this.removeDelay = 0.28;
         this.interactionRange = 5;
         this.lootTable = lootTable || [
             { item: 'food', probability: 1, minCount: 2, maxCount: 5 }
@@ -65,16 +67,45 @@ export class ChestSpawner {
             chest.isLootChest = true;
             chest.opened = false;
             chest.openProgress = 0;
+            chest.interactionScale = 1;
+            chest.bounceElapsed = null;
+            chest.removeElapsed = null;
+            chest.baseY = chest.transform.position.y;
+            chest.baseScale = 1;
             chest.lootTable = this.lootTable.map((entry) => ({ ...entry }));
             chest.update = (dt) => {
+                if (chest.removeElapsed !== null) {
+                    chest.removeElapsed += dt;
+                    if (chest.bounceElapsed !== null && chest.bounceElapsed < this.bounceDuration) {
+                        chest.bounceElapsed += dt;
+                        const t = Math.min(chest.bounceElapsed / this.bounceDuration, 1);
+                        const bounce = Math.abs(Math.sin(t * Math.PI * 2.5)) * (1 - t) * 0.7;
+                        chest.transform.position.y = chest.baseY + bounce;
+                        const scale = Math.max(0, 1 - t * 0.18);
+                        chest.transform.scale.set(scale, scale, scale);
+                    }
+                    if (chest.removeElapsed >= this.removeDelay) this._removeChest(chest);
+                    return;
+                }
                 if (chest.opened) return;
-                if (this.openingChest === chest && Math.hypot(chest.transform.position.x - this._playerPosition().x, chest.transform.position.z - this._playerPosition().z) <= this.interactionRange) {
+                const heldNearby = this.openingChest === chest && Math.hypot(chest.transform.position.x - this._playerPosition().x, chest.transform.position.z - this._playerPosition().z) <= this.interactionRange;
+                if (heldNearby) {
+                    chest.interactionScale = Math.min(1.18, chest.interactionScale + dt * 0.8);
                     chest.openProgress = Math.min(1, chest.openProgress + dt / this.openDuration);
-                    chest.transform.rotation.x = -1.25 * chest.openProgress;
-                    if (chest.openProgress === 1) this._grantLoot(chest);
+                    chest.transform.scale.set(chest.interactionScale, chest.interactionScale, chest.interactionScale);
+                    if (chest.openProgress === 1) {
+                        this._grantLoot(chest);
+                        chest.removeElapsed = 0;
+                        chest.bounceElapsed = 0;
+                        this.openingChest = null;
+                    }
                 } else if (chest.openProgress > 0) {
                     chest.openProgress = Math.max(0, chest.openProgress - dt * 2.5 / this.openDuration);
-                    chest.transform.rotation.x = -1.25 * chest.openProgress;
+                    chest.interactionScale = Math.max(1, chest.interactionScale - dt * 0.8);
+                    chest.transform.scale.set(chest.interactionScale, chest.interactionScale, chest.interactionScale);
+                } else if (chest.interactionScale > 1) {
+                    chest.interactionScale = Math.max(1, chest.interactionScale - dt * 0.8);
+                    chest.transform.scale.set(chest.interactionScale, chest.interactionScale, chest.interactionScale);
                 }
             };
             this.scene.push(chest);
@@ -109,6 +140,13 @@ export class ChestSpawner {
             const count = min + Math.floor(this.random() * (max - min + 1));
             this.inventory?.addItem(entry.item, count);
         }
+    }
+
+    _removeChest(chest) {
+        const sceneIndex = this.scene.indexOf(chest);
+        if (sceneIndex !== -1) this.scene.splice(sceneIndex, 1);
+        const chestIndex = this.chests.indexOf(chest);
+        if (chestIndex !== -1) this.chests.splice(chestIndex, 1);
     }
 
     update(dt) { for (const chest of this.chests) chest.update(dt); }

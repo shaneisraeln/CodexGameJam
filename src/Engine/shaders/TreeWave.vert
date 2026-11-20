@@ -6,6 +6,7 @@ uniform float uWaveSpeed;
 uniform float uWaveStrength;
 uniform float uWaveFrequency;
 uniform float uWaveHeight;
+uniform float uGrassBatch;
 uniform vec2 uWindDir;
 
 vec2 grad(vec2 p) {
@@ -30,8 +31,12 @@ float perlin2D(vec2 p) {
 void vertex(inout vec3 localPos, inout vec3 worldPos, inout vec3 yDisplacement,
             inout vec3 normal, inout vec3 color, inout vec2 texCoord, in mat4 modelMatrix)
 {
-    // Root pinning — vertices near y=0 don't move
-    float heightMask = smoothstep(0.0, uWaveHeight, localPos.y);
+    // For merged grass batches localPos is world-space; use the terrain's
+    // approximate ground level as the blade root. Standalone foliage keeps
+    // its original local-space root mask.
+    float heightMask = uGrassBatch > 0.5
+        ? smoothstep(-11.0, -10.65 + uWaveHeight, localPos.y)
+        : smoothstep(0.0, uWaveHeight, localPos.y);
 
 
     vec3 worldOrigin = modelMatrix[3].xyz;

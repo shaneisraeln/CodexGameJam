@@ -23,6 +23,7 @@ import { FirstPersonController } from './FirstPersonController.js';
 import { FirstPersonHand } from './FirstPersonHand.js';
 import { PlayerInventory } from './PlayerInventory.js';
 import { ChestSpawner } from './ChestSpawner.js';
+import { GrassBatchSpawner } from './GrassBatchSpawner.js';
 import { FloatingObjectSpawner } from './FloatingObjectSpawner.js';
 
 
@@ -189,6 +190,7 @@ matTreeWave.setUniforms({
     'uWaveStrength': 0.7,
     'uWaveFrequency': 100,
     'uWaveHeight': 7.0,
+    'uGrassBatch': 0.0,
     'uWindDir': [1.0, 0.5], // New: Direction the breeze flows
 });
 
@@ -198,10 +200,12 @@ matGrassWave.setUniforms({
     'uMainTex': shipTexture.texture,
     'uRoughness': 1.0,
     'uTime': 0.0,
-    'uWaveSpeed': 1,
-    'uWaveStrength': 0.7,
-    'uWaveFrequency': 1,
-    'uWaveHeight': 1,
+    'uWaveSpeed': 0.5,
+    'uWaveStrength': 0.2,
+    'uWaveFrequency': 200,
+    // Grass meshes are well under one unit tall; use a short mask so their blades sway.
+    'uWaveHeight': 0.35,
+    'uGrassBatch': 1.0,
     'uWindDir': [1.0, 0.5], // New: Direction the breeze flows
 });
 
@@ -440,7 +444,6 @@ const landSpawner = new LandObjectSpawner(gl, renderer, matScene, scene, [], {
         TreeWave: matTreeWave
     }
 });
-
 const oceanConfig = {
     direction: {
         x: 0.207,
@@ -462,6 +465,12 @@ const floatingSpawnConfig = {
     },
     yFixed: -6.25
 };
+
+const grassBatchSpawner = new GrassBatchSpawner(gl, renderer, matGrassWave, scene, {
+    density: 0.03,
+    scaleRange: [0.5, 1.35],
+    seed: floatingSpawnConfig.seed
+});
 
 let floatingObjects = [];
 let landObjects = [];
@@ -506,6 +515,11 @@ if (floatingSpawnConfig.enabled) {
     ).then(spawned => {
         landObjects = spawned;
         console.log(`Spawned ${spawned.length} land objects with seed ${floatingSpawnConfig.seed}`);
+    });
+
+    grassBatchSpawner.setSeed(floatingSpawnConfig.seed);
+    grassBatchSpawner.spawn(floatingSpawnConfig.bounds, -11.0).then((batches) => {
+        console.log(`Spawned ${batches.length} static grass batches`);
     });
 
     chestSpawner.setSeed(floatingSpawnConfig.seed ^ 0x51F15E);
@@ -665,10 +679,11 @@ game.spawnLandObjects = async (count) => {
 // Seed-based spawning control
 game.respawnWithSeed = (seed) => {
     landSpawner.clearCollisionObjects();
+    grassBatchSpawner.clear();
     // Keep only non-random objects (water LOD tiles, terrain, etc.)
     // Filter out anything with "[Floating]" or "[Land]" in the name
-    const staticObjects = scene.filter(
-        obj => !obj.name || (!obj.name.includes('[Floating]') && !obj.name.includes('[Land]'))
+    const staticObjects = scene.filter(obj =>
+        !obj.isGrassBatch && !obj.isLootChest && (!obj.name || (!obj.name.includes('[Floating]') && !obj.name.includes('[Land]') && !obj.name.startsWith('Grass Batch:')))
     );
     scene.length = 0;
     scene.push(...staticObjects);
@@ -678,6 +693,8 @@ game.respawnWithSeed = (seed) => {
     // Set new seed and spawn
     floatingSpawner.setSeed(seed);
     landSpawner.setSeed(seed);
+    grassBatchSpawner.setSeed(seed);
+    chestSpawner.setSeed(seed ^ 0x51F15E);
     floatingSpawnConfig.seed = seed;
     const rand = mulberry32(seed);
     const offsetRange = 32000;
@@ -696,6 +713,8 @@ game.respawnWithSeed = (seed) => {
         floatingSpawnConfig.bounds,
         -11.0
     );
+    grassBatchSpawner.spawn(floatingSpawnConfig.bounds, -11.0);
+    chestSpawner.spawnMany(16, floatingSpawnConfig.bounds, -11.0);
     console.log(`Respawned with seed ${seed}: ${spawned.length} objects`);
     return spawned;
 };
