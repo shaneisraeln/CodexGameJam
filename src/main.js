@@ -662,9 +662,11 @@ window.floatingSpawnConfig = floatingSpawnConfig;
 const cameraController = new FirstPersonController(camera, canvas);
 game.cameraController = cameraController;
 const firstPersonHand = new FirstPersonHand(gl, renderer, shaderMain, camera, scene, {
-    controller: cameraController
+    controller: cameraController,
+    inputElement: canvas
 });
 game.firstPersonHand = firstPersonHand;
+game.attack = () => firstPersonHand.attack();
 
 // #endregion
 
