@@ -26,17 +26,17 @@ export class FloatingObjectSpawner {
         const defaultThreshold = (rawValue) => rawValue >= 0.2 && rawValue <= 0.3;  // Others in water/beach
         
         this.models = [
-            // Barrels and containers (barrel: full 3D, others: Y-only)
-            { file: 'barrel.obj', name: 'Barrel', type: 'container', rotationMode: '3d', scale: 1.0, yOffset: -0.2, probability: 0.25, thresholdCallback: defaultThreshold },
-            { file: 'crate.obj', name: 'Crate', type: 'container', rotationMode: 'y-only', scale: 1.0, yOffset: -0.2, probability: 0.15, thresholdCallback: defaultThreshold },
-            { file: 'chest.obj', name: 'Treasure Chest', type: 'container', rotationMode: 'y-only', scale: 1.0, yOffset: -0.3, probability: 0.15, thresholdCallback: defaultThreshold },
+            // // Barrels and containers (barrel: full 3D, others: Y-only)
+            // { file: 'barrel.obj', name: 'Barrel', type: 'container', rotationMode: '3d', scale: 1.0, yOffset: -0.2, probability: 0.25, thresholdCallback: defaultThreshold },
+            // { file: 'crate.obj', name: 'Crate', type: 'container', rotationMode: 'y-only', scale: 1.0, yOffset: -0.2, probability: 0.15, thresholdCallback: defaultThreshold },
+            // { file: 'chest.obj', name: 'Treasure Chest', type: 'container', rotationMode: 'y-only', scale: 1.0, yOffset: -0.3, probability: 0.15, thresholdCallback: defaultThreshold },
             
-            // Bottles (bottle: full 3D, large bottle: Y-only)
-            { file: 'bottle.obj', name: 'Bottle', type: 'bottle', rotationMode: '3d', scale: 1.0, yOffset: -0.5, probability: 0.22, thresholdCallback: defaultThreshold },
-            { file: 'bottle-large.obj', name: 'Large Bottle', type: 'bottle', rotationMode: 'y-only', scale: 1.0, yOffset: -0.5, probability: 0.08, thresholdCallback: defaultThreshold },
+            // // Bottles (bottle: full 3D, large bottle: Y-only)
+            // { file: 'bottle.obj', name: 'Bottle', type: 'bottle', rotationMode: '3d', scale: 1.0, yOffset: -0.5, probability: 0.22, thresholdCallback: defaultThreshold },
+            // { file: 'bottle-large.obj', name: 'Large Bottle', type: 'bottle', rotationMode: 'y-only', scale: 1.0, yOffset: -0.5, probability: 0.08, thresholdCallback: defaultThreshold },
             
-            // Ships (Y rotation only, low probability) - only spawn in deep water (rawValue <= 0.3)
-            { file: 'ship-large.obj', name: 'Ship Large', type: 'ship', rotationMode: 'y-only', scale: 2.0, yOffset: -1, probability: 0.007, thresholdCallback: shipThreshold },
+            // // Ships (Y rotation only, low probability) - only spawn in deep water (rawValue <= 0.3)
+            // { file: 'ship-large.obj', name: 'Ship Large', type: 'ship', rotationMode: 'y-only', scale: 2.0, yOffset: -1, probability: 0.007, thresholdCallback: shipThreshold },
             // { file: 'ship.obj', name: 'Ship Large', type: 'ship', rotationMode: 'y-only', scale: 1.0, yOffset: 0, probability: 1, thresholdCallback: shipThreshold },
             { file: 'ship-pirate-large.obj', name: 'Pirate Ship Large', type: 'ship', rotationMode: 'y-only', scale: 2.0, yOffset: -1.5, probability: 0.007, thresholdCallback: shipThreshold },
             { file: 'ship-pirate-medium.obj', name: 'Pirate Ship Medium', type: 'ship', rotationMode: 'y-only', scale: 2.0, yOffset: -1.5, probability: 0.007, thresholdCallback: shipThreshold },
@@ -46,12 +46,12 @@ export class FloatingObjectSpawner {
             { file: 'ship-small.obj', name: 'Ship Large', type: 'ship', rotationMode: 'y-only', scale: 2.0, yOffset: -1.5, probability: 0.007, thresholdCallback: shipThreshold },    
             
             // Boats (Y rotation only)
-            { file: 'boat-row-large.obj', name: 'Rowboat Large', type: 'boat', rotationMode: 'y-only', scale: 1.0, yOffset: -0.2, probability: 0.15, thresholdCallback: defaultThreshold },
-            { file: 'boat-row-small.obj', name: 'Rowboat Small', type: 'boat', rotationMode: 'y-only', scale: 1.0, yOffset: -0.2, probability: 0.18, thresholdCallback: defaultThreshold },
+            // { file: 'boat-row-large.obj', name: 'Rowboat Large', type: 'boat', rotationMode: 'y-only', scale: 1.0, yOffset: -0.2, probability: 0.15, thresholdCallback: defaultThreshold },
+            // { file: 'boat-row-small.obj', name: 'Rowboat Small', type: 'boat', rotationMode: 'y-only', scale: 1.0, yOffset: -0.2, probability: 0.18, thresholdCallback: defaultThreshold },
             
-            // Platforms/Pallets (Y rotation only, high probability)
-            { file: 'platform.obj', name: 'Platform', type: 'platform', rotationMode: 'y-only', scale: 1.0, yOffset: -0.2, probability: 0.20, thresholdCallback: defaultThreshold },
-            { file: 'platform-planks.obj', name: 'Platform Planks', type: 'platform', rotationMode: 'y-only', scale: 1.0, yOffset: -0.15, probability: 0.18, thresholdCallback: defaultThreshold },        
+            // // Platforms/Pallets (Y rotation only, high probability)
+            // { file: 'platform.obj', name: 'Platform', type: 'platform', rotationMode: 'y-only', scale: 1.0, yOffset: -0.2, probability: 0.20, thresholdCallback: defaultThreshold },
+            // { file: 'platform-planks.obj', name: 'Platform Planks', type: 'platform', rotationMode: 'y-only', scale: 1.0, yOffset: -0.15, probability: 0.18, thresholdCallback: defaultThreshold },        
         ];
         
         this.loadedMeshCount = 0;

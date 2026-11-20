@@ -22,6 +22,7 @@ import { Editor } from './Editor/Editor.js';
 import { FirstPersonController } from './FirstPersonController.js';
 import { FirstPersonHand } from './FirstPersonHand.js';
 import { PlayerInventory } from './PlayerInventory.js';
+import { ChestSpawner } from './ChestSpawner.js';
 import { FloatingObjectSpawner } from './FloatingObjectSpawner.js';
 
 
@@ -422,6 +423,13 @@ scene.push(Terrain);
 // #region Floating Objects Configuration
 
 const floatingSpawner = new FloatingObjectSpawner(gl, renderer, matBuoyancy, scene);
+const chestSpawner = new ChestSpawner(gl, renderer, matScene, scene, null, {
+    camera,
+    seed: 68,
+    lootTable: [
+        { item: 'food', probability: 1, minCount: 2, maxCount: 5 }
+    ]
+});
 const landSpawner = new LandObjectSpawner(gl, renderer, matScene, scene, [], {
     threshold: 0.425,
     collisionWorld,
@@ -441,7 +449,7 @@ const oceanConfig = {
 
 const floatingSpawnConfig = {
     enabled: true,
-    count: 50,
+    count: 10,
     seed: 68,
     bounds: {
         minX: -(255 * Math.sqrt(3) / 2),
@@ -495,6 +503,11 @@ if (floatingSpawnConfig.enabled) {
     ).then(spawned => {
         landObjects = spawned;
         console.log(`Spawned ${spawned.length} land objects with seed ${floatingSpawnConfig.seed}`);
+    });
+
+    chestSpawner.setSeed(floatingSpawnConfig.seed ^ 0x51F15E);
+    chestSpawner.spawnMany(16, floatingSpawnConfig.bounds, -11.0).then((spawned) => {
+        console.log(`Spawned ${spawned.length} loot chests`);
     });
 }
 
@@ -728,10 +741,10 @@ const enemySpawner = new EnemySpawner(gl, renderer, matScene, scene, {
 
 let enemies = [];
 
-enemySpawner.spawnGroups(6, floatingSpawnConfig.bounds).then(spawned => {
+enemySpawner.spawnGroups(3, floatingSpawnConfig.bounds).then(spawned => {
     enemies = spawned;
     game.enemies = enemies; // keep game object in sync
-    console.log(`[Enemies] Spawned ${spawned.length} enemies in 6 groups.`);
+    console.log(`[Enemies] Spawned ${spawned.length} enemies in 3 groups.`);
 });
 
 game.enemySpawner = enemySpawner;
@@ -766,6 +779,7 @@ const playerInventory = new PlayerInventory(gl, renderer, shaderMain, camera, sc
     hand: firstPersonHand,
     controller: cameraController
 });
+chestSpawner.inventory = playerInventory;
 firstPersonHand.inventory = playerInventory;
 game.inventory = playerInventory;
 game.player.inventory = playerInventory;
@@ -829,6 +843,7 @@ function loop(now) {
     cameraController.update(Time.deltaTime);
     firstPersonHand.update(Time.deltaTime);
     playerInventory.update(Time.deltaTime);
+    chestSpawner.update(Time.deltaTime);
 
     // ── Enemy update loop ────────────────────────────────────────────────
     if (enemies.length > 0) {

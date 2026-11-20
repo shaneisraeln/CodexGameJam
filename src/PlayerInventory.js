@@ -14,7 +14,7 @@ export class PlayerInventory {
             swordAttackDuration: 0.62,
             swordHitTime: 0.3,
             swordAttackCooldown: 0.72,
-            eatDuration: 1.6,
+            eatDuration: 0.9,
             ...settings
         };
         this.camera = camera;
@@ -259,7 +259,7 @@ export class PlayerInventory {
         let swordPose = { x: 0, y: 0, z: 0, pitch: 0, roll: 0 };
         const eatProgress = this.hand?.eatElapsed === null || this.hand?.eatElapsed === undefined
             ? 0
-            : Math.min(this.hand.eatElapsed / (this.hand.settings.eatDuration || 1.6), 1);
+            : Math.min(this.hand.eatElapsed / (this.hand.settings.eatDuration || this.settings.eatDuration), 1);
         const foodBite = this.eating && eatProgress < 0.88
             ? Math.pow(Math.max(0, Math.sin(eatProgress * Math.PI * 6)), 1.5)
             : 0;
@@ -309,8 +309,15 @@ export class PlayerInventory {
 
         for (const slot of this.slots) {
             if (!slot.gameObject) continue;
+            const completionPulse = slot.id === 'food' ? (this.hand?.eatCompletePulse || 0) : 0;
             const pose = slot.id === 'sword' ? swordPose : slot.id === 'food'
-                ? { x: -0.12 * foodBite, y: 0.22 * foodBite, z: 0.16 * foodBite, pitch: -0.35 * foodBite, roll: 0.1 * foodBite }
+                ? {
+                    x: -0.12 * foodBite,
+                    y: 0.22 * foodBite + 0.12 * completionPulse,
+                    z: 0.16 * foodBite,
+                    pitch: -0.35 * foodBite - 0.18 * completionPulse,
+                    roll: 0.1 * foodBite
+                }
                 : null;
             slot.gameObject.transform.position.set(
                 slot.position[0] + bobX + (pose?.x || 0),
@@ -322,6 +329,12 @@ export class PlayerInventory {
                 slot.rotation[1],
                 slot.rotation[2] + (pose?.roll || 0)
             );
+            if (slot.id === 'food' && slot.material) {
+                const flash = completionPulse * 0.45;
+                slot.material.setUniforms({
+                    uColor: [1, 1 - flash, 1 - flash, 1]
+                });
+            }
         }
     }
 

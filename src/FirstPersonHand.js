@@ -29,7 +29,7 @@ export class FirstPersonHand {
             attackDiagonalDrop: 0.14,
             attackDiagonalRoll: 0.55,
             attackDiagonalPitch: 0.3,
-            eatDuration: 1.6,
+            eatDuration: 0.9,
             ...settings
         };
         this.camera = camera;
@@ -43,6 +43,7 @@ export class FirstPersonHand {
         this.attackCooldownRemaining = 0;
         this.attackHitApplied = false;
         this.eatElapsed = null;
+        this.eatCompletePulse = 0;
         this.weapon = null;
 
         this._onMouseDown = (event) => {
@@ -107,6 +108,7 @@ export class FirstPersonHand {
         }
         let attackPulse = 0;
         let eatPulse = 0;
+        this.eatCompletePulse = Math.max(0, this.eatCompletePulse - frameTime * 2.5);
         if (this.attackCooldownRemaining > 0) {
             this.attackCooldownRemaining = Math.max(0, this.attackCooldownRemaining - frameTime);
         }
@@ -130,7 +132,10 @@ export class FirstPersonHand {
                 : 1 - (progress - 0.88) / 0.12;
             if (progress >= 1) {
                 this.eatElapsed = null;
-                if (this.inventory?.finishEating()) this.onEatFood?.(10);
+                if (this.inventory?.finishEating()) {
+                    this.eatCompletePulse = 1;
+                    this.onEatFood?.(20);
+                }
             }
         }
 
