@@ -24,6 +24,7 @@ import { FirstPersonHand } from './FirstPersonHand.js';
 import { PlayerInventory } from './PlayerInventory.js';
 import { ChestSpawner } from './ChestSpawner.js';
 import { FloatingObjectSpawner } from './FloatingObjectSpawner.js';
+import { GrassBatchSpawner } from './GrassBatchSpawner.js';
 
 
 // Shader imports
