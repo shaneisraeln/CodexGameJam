@@ -23,7 +23,7 @@ export class HexGridMesh extends Mesh {
     static terrainValue(v) {
         if (v <= 0.3) return 20 / 255;
         // if (v <= 0.3) return 37 / 255;
-        return (180 / 255);
+        return 0.4 + v;
     }
 
     exportOBJ(filename, vertices, uvs, normals, indices) {

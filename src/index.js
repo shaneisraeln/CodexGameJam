@@ -1,7 +1,9 @@
 // PiGL.js Library Entry Point
 // Engine Core
 export { GameObject } from './Engine/Core/GameObject.js';
+export { Health } from './Engine/Core/Health.js';
 export { Time } from './Engine/Core/TimeManager.js';
+export { PlayerInventory } from './PlayerInventory.js';
 
 // Input
 export { CameraController } from './Engine/Input/CameraController.js';

@@ -10,6 +10,7 @@ import { Time } from './Engine/Core/TimeManager.js';
 import { ObjLoader } from './Engine/Loaders/ObjLoader.js';
 import { Texture } from './Engine/Rendering/Texture.js';
 import { RenderQueue } from './Engine/Rendering/RenderQueue.js';
+import { CollisionWorld, CollisionLayer } from './Engine/Physics/CollisionWorld.js';
 import { ObjectRenderPass } from './Engine/Rendering/ObjectRenderPass.js';
 import { ViewportPass } from './Engine/Rendering/Passes/ViewportPass.js';
 import { LightingPass } from './Engine/Rendering/Passes/LightingPass.js';
@@ -17,9 +18,12 @@ import { SkyboxPass } from './Engine/Rendering/Passes/SkyboxPass.js';
 import { PixelArtPass } from './Engine/Rendering/Passes/PixelArtPass.js';
 import { WireframePass } from './Engine/Rendering/Passes/WireframePass.js';
 import { ProfilerInstrumenter } from './Engine/Profiling/Profiler.js';
-import { Editor } from './Editor/Editor.js';
-import { CameraController } from './Engine/Input/CameraController.js';
+import { FirstPersonController } from './FirstPersonController.js';
+import { FirstPersonHand } from './FirstPersonHand.js';
+import { PlayerInventory } from './PlayerInventory.js';
+import { ChestSpawner } from './ChestSpawner.js';
 import { FloatingObjectSpawner } from './FloatingObjectSpawner.js';
+import { GrassBatchSpawner } from './GrassBatchSpawner.js';
 
 
 // Shader imports
@@ -35,10 +39,35 @@ import BuoyancyVs from './Engine/shaders/Buoyancy.vert?raw';
 import treeWaveVs from './Engine/shaders/TreeWave.vert?raw';
 import masterVs from './Engine/shaders/ShaderLib/Master.vert?raw';
 import masterFs from './Engine/shaders/ShaderLib/Master.frag?raw';
-import { HexGridMesh } from './HexGridMesh.js';
-import { LandObjectSpawner } from './LandObjectSpawner.js';
+import {
+    HexGridMesh
+} from './HexGridMesh.js';
+import {
+    LandObjectSpawner
+} from './LandObjectSpawner.js';
 import CONTINENT from './CustomMapNoise.js';
-import { Vector3 } from './Engine/Math/Vector3.js';
+import {
+    Vector3
+} from './Engine/Math/Vector3.js';
+import {
+    PlayerHealth
+} from './PlayerHealth.js';
+import {
+    EnemySpawner
+} from './Enemies/EnemySpawner.js';
+import {
+    Poof
+} from './Enemies/Poof.js';
+import {
+    ResourceTracker
+} from './ResourceTracker.js';
+import {
+    DeathScreen
+} from './DeathScreen.js';
+import {
+    AudioManager
+} from './AudioManager.js';
+import { StoryFlow } from './StoryFlow.js';
 
 // #endregion
 
@@ -52,7 +81,9 @@ const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/
 
 const canvas = document.getElementById('glcanvas');
 const gl = canvas.getContext('webgl2') || canvas.getContext('experimental-webgl');
-if (!gl) { alert('Unable to initialize WebGL.'); }
+if (!gl) {
+    alert('Unable to initialize WebGL.');
+}
 
 // WebGL state setup
 gl.enable(gl.DEPTH_TEST);
@@ -68,28 +99,36 @@ gl.getExtension('EXT_color_buffer_float');
 
 // Albedo — 8bit RGBA is enough, no need for float
 let sceneBuffer = new RenderTarget(gl, window.innerWidth, window.innerHeight, {
-    format: 'RGBA', precision: '8',
-    minFilter: gl.NEAREST, magFilter: gl.NEAREST
+    format: 'RGBA',
+    precision: '8',
+    minFilter: gl.NEAREST,
+    magFilter: gl.NEAREST
 });
 
 // Depth — single channel, needs 32f for precision
 let Gbuffer = new RenderTarget(gl, window.innerWidth, window.innerHeight, {
-    format: 'RGBA', precision: '8',
+    format: 'RGBA',
+    precision: '8',
     depth: true,
-    minFilter: gl.NEAREST, magFilter: gl.NEAREST
+    minFilter: gl.NEAREST,
+    magFilter: gl.NEAREST
 });
 
 // Pixel art pass — 8bit RGBA, plain color output
 let pixelArtBuffer = new RenderTarget(gl, window.innerWidth, window.innerHeight, {
-    format: 'RGB', precision: '8',
+    format: 'RGB',
+    precision: '8',
     depth: false,
-    minFilter: gl.NEAREST, magFilter: gl.NEAREST
+    minFilter: gl.NEAREST,
+    magFilter: gl.NEAREST
 });
 
 let lightingBuffer = new RenderTarget(gl, window.innerWidth, window.innerHeight, {
-    format: 'RGB', precision: '8',
+    format: 'RGB',
+    precision: '8',
     depth: false,
-    minFilter: gl.NEAREST, magFilter: gl.NEAREST
+    minFilter: gl.NEAREST,
+    magFilter: gl.NEAREST
 });
 
 // #endregion
@@ -133,19 +172,19 @@ const matPixelArt = new Material(shaderPixelArt, 'PixelArt');
 const matScreen = new Material(shaderScreen, 'Screen');
 
 // Buoyancy material setup
-matBuoyancy.setUniforms({ 
-    'uColor': [1.0, 1.0, 1.0, 1.0], 
-    'uHasTexture': 1.0, 
-    'uMainTex': shipTexture.texture, 
+matBuoyancy.setUniforms({
+    'uColor': [1.0, 1.0, 1.0, 1.0],
+    'uHasTexture': 1.0,
+    'uMainTex': shipTexture.texture,
     'uRoughness': 1.0,
-    'uSampleRadius': 0.25  // Multi-point wave sampling for smooth buoyancy
+    'uSampleRadius': 0.25 // Multi-point wave sampling for smooth buoyancy
 });
 
 // Scene material setup
-matScene.setUniforms({ 
-    'uColor': [1.0, 1.0, 1.0, 1.0], 
-    'uHasTexture': 1.0, 
-    'uMainTex': shipTexture.texture, 
+matScene.setUniforms({
+    'uColor': [1.0, 1.0, 1.0, 1.0],
+    'uHasTexture': 1.0,
+    'uMainTex': shipTexture.texture,
     'uRoughness': 1.0
 });
 
@@ -160,6 +199,7 @@ matTreeWave.setUniforms({
     'uWaveStrength': 0.7,
     'uWaveFrequency': 100,
     'uWaveHeight': 7.0,
+    'uGrassBatch': 0.0,
     'uWindDir': [1.0, 0.5], // New: Direction the breeze flows
 });
 
@@ -169,17 +209,19 @@ matGrassWave.setUniforms({
     'uMainTex': shipTexture.texture,
     'uRoughness': 1.0,
     'uTime': 0.0,
-    'uWaveSpeed': 1,
-    'uWaveStrength': 0.7,
-    'uWaveFrequency': 1,
-    'uWaveHeight': 1,
+    'uWaveSpeed': 0.5,
+    'uWaveStrength': 0.2,
+    'uWaveFrequency': 200,
+    // Grass meshes are well under one unit tall; use a short mask so their blades sway.
+    'uWaveHeight': 0.35,
+    'uGrassBatch': 1.0,
     'uWindDir': [1.0, 0.5], // New: Direction the breeze flows
 });
 
-planeTer.setUniforms({ 
-    'uColor': [1.0, 1.0, 1.0, 1.0], 
-    'uHasTexture': 0.0, 
-    'uMainTex': islandTexture.texture, 
+planeTer.setUniforms({
+    'uColor': [1.0, 1.0, 1.0, 1.0],
+    'uHasTexture': 0.0,
+    'uMainTex': islandTexture.texture,
     'uRoughness': 1.0
 });
 
@@ -188,12 +230,12 @@ matPixelArt.setUniforms({
     'uPixelSize': isMobile ? 1 : 1.0,
     'uEdgeWidth': 1,
     'uColorLevels': 128.0,
-    'uEdgeDistance' : 1,
-    'uCurvature' : 2,
+    'uEdgeDistance': 1,
+    'uCurvature': 2,
     'uDepthThreshold': 0.01,
     'uNormalThreshold': 0.3,
-    'uSilhouetteDarkening': 0.2, 
-    'uCreaseDarkening': 0.7,   
+    'uSilhouetteDarkening': 0.2,
+    'uCreaseDarkening': 0.7,
 });
 
 // Lighting material setup
@@ -228,25 +270,27 @@ const waterConfig = {
     'udisplacement': 1.5,
     'uScale': 1,
     'uBuoyancyRotation': 0.3,
-    'uColor1': [0.090, 0.271, 0.490], 
-    'uColor2': [0.192, 0.404, 0.624],  
-    'uColor3': [0.800, 0.800, 1.000],   
-    'uColor1Smoothstep': [0, 0.5],   
-    'uColor2Smoothstep': [0, 2],   
+    'uColor1': [0.090, 0.271, 0.490],
+    'uColor2': [0.192, 0.404, 0.624],
+    'uColor3': [0.800, 0.800, 1.000],
+    'uColor1Smoothstep': [0, 0.5],
+    'uColor2Smoothstep': [0, 2],
     'uWaveA': [-0.35, 0.70, 0.13, 3.92],
     'uWaveB': [-0.95, 0.51, 0.10, 2.25],
     'uWaveC': [-0.4, -2, 0.1, 13.5],
     'uColorBands': 3.0,
     'uRoughness': 0.0,
-    'uDepthThreshold':0.5,
-    'uFoamIntensity':1.0
+    'uDepthThreshold': 0.5,
+    'uFoamIntensity': 1.0
 };
 
 matBuoyancy.setUniforms(waterConfig);
 matWater.setUniforms(waterConfig);
-matBuoyancy.setUniforms({ 'uRoughness': 1.0 });
+matBuoyancy.setUniforms({
+    'uRoughness': 1.0
+});
 
-// Register Materials for Editor
+// Register materials used by the game systems.
 const materials = {
     'Lighting': matLighting,
     'Skybox': matSkybox,
@@ -257,7 +301,10 @@ const materials = {
     'GrassWave': matGrassWave,
     'planeTer': planeTer
 };
-var  a = {num: 10, num2 : 20}
+var a = {
+    num: 10,
+    num2: 20
+}
 
 
 // #endregion
@@ -268,6 +315,10 @@ const renderer = new Renderer(gl);
 const camera = new Camera();
 const scene = [];
 const renderQueue = new RenderQueue(gl);
+const collisionWorld = new CollisionWorld({
+    cellSize: 16,
+    defaultLayer: CollisionLayer.WORLD
+});
 
 // #endregion
 
@@ -325,7 +376,7 @@ renderQueue.addPass(viewportPass);
 
 function resizeCanvas() {
     // 1. Physical Canvas size (the display size on screen)
-    canvas.width = window.innerWidth ;
+    canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
     // 2. Calculate the internal "Render Resolution"
@@ -335,19 +386,19 @@ function resizeCanvas() {
 
     // 3. Set the Viewport to match the Render Resolution
     gl.viewport(0, 0, renderW, renderH);
-    
+
     // 4. Resize your Buffers to the Render Resolution, NOT the window size
     // This is where the actual performance gain happens
     sceneBuffer.resize(renderW, renderH);
     Gbuffer.resize(renderW, renderH);
     lightingBuffer.resize(renderW, renderH);
     pixelArtBuffer.resize(renderW, renderH);
-    
+
     renderQueue.resize(renderW, renderH);
 
     // 5. Camera aspect ratio should still use the visual aspect
     const aspect = canvas.width / canvas.height;
-    camera.setPerspective(0.8, aspect, 0.1, 1000.0);
+    camera.setPerspective(75 * Math.PI / 180, aspect, 0.1, 1000.0);
 }
 
 window.addEventListener('resize', resizeCanvas);
@@ -358,7 +409,7 @@ resizeCanvas();
 // #region Camera Setup
 
 const aspect = canvas.width / canvas.height;
-camera.setPerspective(0.8, aspect, 0.1, 1000.0);
+camera.setPerspective(75 * Math.PI / 180, aspect, 0.1, 1000.0);
 camera.transform.position.set(-39.2, 1.8, -47);
 camera.transform.rotation.set(0.0, isMobile ? 3.24 : 3.22, 0);
 
@@ -368,9 +419,16 @@ const size = 30.0;
 
 // #region Scene Objects Loading
 
+const initialWorldSeed = Math.floor(Math.random() * 0x100000000);
+const initialSeedRandom = mulberry32(initialWorldSeed);
+const initialOffsetRange = 32000;
+CONTINENT.setOffsets(
+    (initialSeedRandom() - 0.5) * initialOffsetRange,
+    (initialSeedRandom() - 0.5) * initialOffsetRange
+);
 
 let Terrain = new GameObject(renderer, planeTer, new HexGridMesh(gl, 255, 255, 1.0, true), 'Scense');
-Terrain.transform.position.set( -(255 * Math.sqrt(3)/2), -11 , -(255 * 1.5/2));
+Terrain.transform.position.set(-(255 * Math.sqrt(3) / 2), -11, -(255 * 1.5 / 2));
 Terrain.transform.scale.set(1, 0.4, 1);
 scene.push(Terrain);
 
@@ -388,30 +446,51 @@ scene.push(Terrain);
 // #region Floating Objects Configuration
 
 const floatingSpawner = new FloatingObjectSpawner(gl, renderer, matBuoyancy, scene);
+const chestSpawner = new ChestSpawner(gl, renderer, matScene, scene, null, {
+    camera,
+    seed: initialWorldSeed ^ 0x51F15E,
+    lootTable: [{
+        item: 'food',
+        probability: 1,
+        minCount: 2,
+        maxCount: 5
+    }]
+});
 const landSpawner = new LandObjectSpawner(gl, renderer, matScene, scene, [], {
     threshold: 0.425,
+    collisionWorld,
     materials: {
         TreeWave: matTreeWave
     }
 });
-
 const oceanConfig = {
-    direction: { x: 0.207, y: 0, z: -0.707 },
+    direction: {
+        x: 0.207,
+        y: 0,
+        z: -0.707
+    },
     speed: 0.0
 };
 
 const floatingSpawnConfig = {
-    enabled: true ,
-    count: 50,
-    seed: 68,
+    enabled: true,
+    count: 10,
+    seed: initialWorldSeed,
     bounds: {
-        minX: -(255 * Math.sqrt(3)/2),
-        maxX: (255 * Math.sqrt(3)/2),
-        minZ: -(255 * 1.5/2),
-        maxZ: (255 * 1.5/2)
+        minX: -(255 * Math.sqrt(3) / 2),
+        maxX: (255 * Math.sqrt(3) / 2),
+        minZ: -(255 * 1.5 / 2),
+        maxZ: (255 * 1.5 / 2)
     },
     yFixed: -6.25
 };
+const shipRepairCost = { total: 12 };
+
+const grassBatchSpawner = new GrassBatchSpawner(gl, renderer, matGrassWave, scene, {
+    density: 0.03,
+    scaleRange: [0.5, 1.35],
+    seed: floatingSpawnConfig.seed
+});
 
 let floatingObjects = [];
 let landObjects = [];
@@ -432,7 +511,7 @@ function rebuildTerrain() {
         if (idx >= 0) scene.splice(idx, 1);
     }
     Terrain = new GameObject(renderer, planeTer, new HexGridMesh(gl, 255, 255, 1.0, true), 'Scense');
-    Terrain.transform.position.set( -(255 * Math.sqrt(3)/2), -11 , -(255 * 1.5/2));
+    Terrain.transform.position.set(-(255 * Math.sqrt(3) / 2), -11, -(255 * 1.5 / 2));
     Terrain.transform.scale.set(1, 0.4, 1);
     scene.push(Terrain);
 }
@@ -457,6 +536,16 @@ if (floatingSpawnConfig.enabled) {
         landObjects = spawned;
         console.log(`Spawned ${spawned.length} land objects with seed ${floatingSpawnConfig.seed}`);
     });
+
+    grassBatchSpawner.setSeed(floatingSpawnConfig.seed);
+    grassBatchSpawner.spawn(floatingSpawnConfig.bounds, -11.0).then((batches) => {
+        console.log(`Spawned ${batches.length} static grass batches`);
+    });
+
+    chestSpawner.setSeed(floatingSpawnConfig.seed ^ 0x51F15E);
+    chestSpawner.spawnMany(16, floatingSpawnConfig.bounds, -11.0).then((spawned) => {
+        console.log(`Spawned ${spawned.length} loot chests`);
+    });
 }
 
 // #endregion
@@ -472,7 +561,7 @@ if (floatingSpawnConfig.enabled) {
 let CenterLOD = null;
 let meshLOD1 = new HexGridMesh(gl, 255, 255, 1.0)
 const centerObj = new GameObject(renderer, matWater, meshLOD1, `Water Floor [0,0]`);
-centerObj.transform.position.set(-(255 * Math.sqrt(3)/2), -6.5, -(255 * 1.5/2));
+centerObj.transform.position.set(-(255 * Math.sqrt(3) / 2), -6.5, -(255 * 1.5 / 2));
 centerObj.transform.scale.set(1, 1, 1);
 scene.push(centerObj);
 CenterLOD = centerObj;
@@ -490,7 +579,7 @@ Promise.all([
     const yPos = -6.5;
     const scale = 50;
     const radius = 5;
-    
+
 
     // Mobile: LOD2 center, LOD3 everything else
     // Desktop: LOD1 center, LOD2 mid ring, LOD3 outer
@@ -502,7 +591,7 @@ Promise.all([
 
     // Center water mesh
     const centerObj = new GameObject(renderer, matWater, centerMesh, `Water Floor [0,0] ${centerLabel}`);
-    centerObj.transform.position.set(-(255 * Math.sqrt(3)/2), yPos-0.5, -(255 * 1.5/2));
+    centerObj.transform.position.set(-(255 * Math.sqrt(3) / 2), yPos - 0.5, -(255 * 1.5 / 2));
     centerObj.transform.scale.set(1, 1, 1);
     scene.push(centerObj);
     CenterLOD = centerObj;
@@ -515,7 +604,7 @@ Promise.all([
 
                 const obj = new GameObject(renderer, matWater, meshLOD3, `Water Floor [${x},${z}] LOD3`);
                 centerObj.transform.add(obj.transform);
-                obj.transform.setGlobalPosition(x * offset, yPos-0.5, z * offset);
+                obj.transform.setGlobalPosition(x * offset, yPos - 0.5, z * offset);
                 obj.transform.scale.set(scale, scale, scale);
 
             }
@@ -527,12 +616,12 @@ Promise.all([
                 if (x === 0 && z === 0) continue;
 
                 const dist = Math.sqrt(x * x + z * z);
-                const mesh = dist <= LOD1_RADIUS ? meshLOD1 
-                    : dist <= LOD2_RADIUS ? meshLOD2 
-                    : meshLOD3;
-                const lodLevel = dist <= LOD1_RADIUS ? 1 
-                    : dist <= LOD2_RADIUS ? 2 
-                    : 3;
+                const mesh = dist <= LOD1_RADIUS ? meshLOD1 :
+                    dist <= LOD2_RADIUS ? meshLOD2 :
+                    meshLOD3;
+                const lodLevel = dist <= LOD1_RADIUS ? 1 :
+                    dist <= LOD2_RADIUS ? 2 :
+                    3;
 
                 const obj = new GameObject(renderer, matWater, mesh, `Water Floor [${x},${z}] LOD${lodLevel}`);
                 centerObj.transform.add(obj.transform);
@@ -548,9 +637,13 @@ Promise.all([
 
 // #region Viewport Configuration
 
-const viewports = [
-    { x: 0.0, y: 0.0, w: 1.0, h: 1.0, pass: 'Final' }
-];
+const viewports = [{
+    x: 0.0,
+    y: 0.0,
+    w: 1.0,
+    h: 1.0,
+    pass: 'Final'
+}];
 viewportPass.setViewports(viewports);
 
 // #endregion
@@ -568,6 +661,7 @@ const game = {
     wireframePass,
     floatingSpawner,
     landSpawner,
+    collisionWorld,
     floatingSpawnConfig,
     textures: {
         ship: shipTexture
@@ -579,9 +673,8 @@ const game = {
 // #region Game API
 
 game.setViewports = (mode) => {
-    viewports[0].pass = mode; 
+    viewports[0].pass = mode;
 };
-
 // Floating object spawner control
 game.spawnFloatingObjects = async (count) => {
     const spawned = await floatingSpawner.spawnMany(
@@ -605,19 +698,23 @@ game.spawnLandObjects = async (count) => {
 
 // Seed-based spawning control
 game.respawnWithSeed = (seed) => {
+    landSpawner.clearCollisionObjects();
+    grassBatchSpawner.clear();
     // Keep only non-random objects (water LOD tiles, terrain, etc.)
     // Filter out anything with "[Floating]" or "[Land]" in the name
-    const staticObjects = scene.filter(
-        obj => !obj.name || (!obj.name.includes('[Floating]') && !obj.name.includes('[Land]'))
+    const staticObjects = scene.filter(obj =>
+        !obj.isGrassBatch && !obj.isLootChest && (!obj.name || (!obj.name.includes('[Floating]') && !obj.name.includes('[Land]') && !obj.name.startsWith('Grass Batch:')))
     );
     scene.length = 0;
     scene.push(...staticObjects);
     floatingObjects = [];
     landObjects = [];
-    
+
     // Set new seed and spawn
     floatingSpawner.setSeed(seed);
     landSpawner.setSeed(seed);
+    grassBatchSpawner.setSeed(seed);
+    chestSpawner.setSeed(seed ^ 0x51F15E);
     floatingSpawnConfig.seed = seed;
     const rand = mulberry32(seed);
     const offsetRange = 32000;
@@ -636,30 +733,250 @@ game.respawnWithSeed = (seed) => {
         floatingSpawnConfig.bounds,
         -11.0
     );
+    grassBatchSpawner.spawn(floatingSpawnConfig.bounds, -11.0);
+    chestSpawner.spawnMany(16, floatingSpawnConfig.bounds, -11.0);
     console.log(`Respawned with seed ${seed}: ${spawned.length} objects`);
     return spawned;
 };
 
 let profiler = null;
 
-    if (!isMobile) {
-        const editor = new Editor(game);
-        game.editor = editor;
-        profiler = ProfilerInstrumenter.attach(renderQueue, renderer, game);
-        game.profiler = profiler;
+// The in-game editor is disabled for the story build.
+
+// #region Resources & Death Screen
+
+const resourceTracker = new ResourceTracker();
+game.resourceTracker = resourceTracker;
+
+const deathScreen = new DeathScreen({
+    onRestart: (seed) => {
+        // Reset player state
+        playerHealth.setHp(playerHealth.maxHp);
+        resourceTracker.reset();
+
+        // Clear all active drops from DOM + array
+        for (let i = 0; i < drops.length; i++) {
+            drops[i]._remove && drops[i]._remove();
+        }
+        drops.length = 0;
+
+        // Respawn world with new seed
+        if (typeof game.respawnWithSeed === 'function') {
+            game.respawnWithSeed(seed);
+        }
+
+        // Respawn enemies fresh
+        enemySpawner.clearAll();
+        enemies.length = 0;
+        wreckPosition = findBeachWreckPosition();
+        wreckGroundY = wreckPosition.y;
+        wreckRawValue = CONTINENT.getValue(wreckPosition.x - terrainOffsetX, wreckPosition.z - terrainOffsetZ, 0);
+        wreckObject?.transform.position.set(wreckPosition.x, wreckGroundY, wreckPosition.z);
+        if (wreckObject?.collider) {
+            const oldCollider = wreckObject.collider;
+            collisionWorld.remove(oldCollider);
+            const colliderIndex = wreckSpawner.colliderHandles.indexOf(oldCollider);
+            wreckObject.collider = collisionWorld.addStaticObject(wreckObject, { radiusScale: 1 });
+            if (colliderIndex >= 0) wreckSpawner.colliderHandles[colliderIndex] = wreckObject.collider;
+        }
+        camera.transform.position.set(wreckPosition.x + 7, wreckGroundY + 2, wreckPosition.z);
+        cameraController.placeOnNearestLand();
+        storyFlow.shipBase = [wreckPosition.x, wreckGroundY, wreckPosition.z];
+        storyFlow.restart();
+        enemySpawner.setSeed(seed ^ 0xDEAD);
+        enemySpawner.spawnGroups(3, floatingSpawnConfig.bounds, 5).then(spawned => {
+            for (let i = 0; i < spawned.length; i++) enemies.push(spawned[i]);
+            game.enemies = enemies;
+        });
     }
+});
+game.deathScreen = deathScreen;
+
+const audio = new AudioManager();
+game.audio = audio;
+
+// #endregion
+
+// #region Player Health
+
+const playerHealth = new PlayerHealth({
+    maxHp: 100,
+    onDeath: () => {
+        audio.playDeath();
+        deathScreen.show(resourceTracker.getAll());
+    },
+    onDamage: (amount, current, max) => {
+        console.log(`Player took ${amount} damage — ${current}/${max} HP remaining.`);
+    }
+});
+
+game.playerHealth = playerHealth;
+game.player = {
+    name: 'Player',
+    health: playerHealth,
+    takeDamage: (amount) => playerHealth.takeDamage(amount),
+    heal: (amount) => playerHealth.heal(amount)
+};
+game.damagePlayer = (amount) => playerHealth.takeDamage(amount);
+game.healPlayer = (amount) => playerHealth.heal(amount);
+
+// #endregion
+
+// #region Enemies
+
+const enemySpawner = new EnemySpawner(gl, renderer, matScene, scene, {
+    seed: floatingSpawnConfig.seed,
+    minNoiseValue: 0.42,
+    collisionWorld
+});
+
+let enemies = [];
+
+// Active loot drops — ticked every frame, spliced out when collected/expired
+const drops = [];
+
+enemySpawner.spawnGroups(3, floatingSpawnConfig.bounds, 5).then(spawned => {
+    enemies = spawned;
+    game.enemies = enemies; // keep game object in sync
+    console.log(`[Enemies] Spawned ${spawned.length} enemies for the escape story.`);
+});
+
+game.enemySpawner = enemySpawner;
+game.enemies = enemies;
+
+// #endregion
 
 // Expose game object globally for console access
 window.game = game;
 window.floatingSpawner = floatingSpawner;
 window.landSpawner = landSpawner;
+window.collisionWorld = collisionWorld;
 window.oceanConfig = oceanConfig;
 window.floatingObjects = floatingObjects;
 window.landObjects = landObjects;
 window.floatingSpawnConfig = floatingSpawnConfig;
 
-const cameraController = new CameraController(camera, canvas);
+const cameraController = new FirstPersonController(camera, canvas, {
+    collisionWorld,
+    collisionLayerMask: CollisionLayer.WORLD,
+    collisionActorLayer: CollisionLayer.PLAYER
+});
 game.cameraController = cameraController;
+const firstPersonHand = new FirstPersonHand(gl, renderer, shaderMain, camera, scene, {
+    controller: cameraController,
+    inputElement: canvas,
+    onEatFood: (healAmount) => game.healPlayer(healAmount),
+    attackDamage: 25,
+    attackReach: 3.2,
+    attackRadius: 0.9
+});
+game.firstPersonHand = firstPersonHand;
+game.attack = () => firstPersonHand.attack();
+
+// ── Patch applyDamage so enemies receive fromPos + camera for knockback/poof ──
+const _origApplyDamage = firstPersonHand.applyDamage.bind(firstPersonHand);
+firstPersonHand.applyDamage = function(target, amount) {
+    if (amount === undefined) amount = firstPersonHand.settings.attackDamage;
+    // Enemy.takeDamage(amount, fromPos, camera)
+    if (target && typeof target.takeDamage === 'function' && target.hitRadius !== undefined) {
+        const result = target.takeDamage(amount, camera.transform.position, camera);
+        // Spawn hit spark if the enemy survived (poof handles death separately)
+        if (result > 0 && !target.isDead) {
+            Poof.spawnHit(target.transform.position, camera);
+        }
+        return typeof result === 'number' ? result : amount;
+    }
+    return _origApplyDamage(target, amount);
+};
+const playerInventory = new PlayerInventory(gl, renderer, shaderMain, camera, scene, {
+    hand: firstPersonHand,
+    controller: cameraController
+});
+chestSpawner.inventory = playerInventory;
+firstPersonHand.inventory = playerInventory;
+game.inventory = playerInventory;
+game.player.inventory = playerInventory;
+
+const wreckSpawner = new LandObjectSpawner(gl, renderer, matScene, scene, ['ship-wreck.obj'], {
+    threshold: 0.45,
+    collisionWorld
+});
+const terrainOffsetX = -(255 * Math.sqrt(3) / 2);
+const terrainOffsetZ = -(255 * 1.5 / 2);
+function sampleTerrainHeight(x, z) {
+    const rawValue = CONTINENT.getValue(x - terrainOffsetX, z - terrainOffsetZ, 0);
+    return -11 + HexGridMesh.terrainValue(rawValue) * 20 * 0.4;
+}
+function findBeachWreckPosition(centerX = -39.2, centerZ = -47) {
+    let best = null;
+    let bestScore = Infinity;
+    for (let radius = 0; radius <= 120; radius += 12) {
+        for (let dz = -radius; dz <= radius; dz += 3) {
+            for (let dx = -radius; dx <= radius; dx += 3) {
+                if (radius > 0 && Math.max(Math.abs(dx), Math.abs(dz)) !== radius) continue;
+                const x = centerX + dx;
+                const z = centerZ + dz;
+                const rawValue = CONTINENT.getValue(x - terrainOffsetX, z - terrainOffsetZ, 0);
+                if (rawValue <= 0.3) continue;
+                const y = sampleTerrainHeight(x, z);
+                const neighborHeights = [
+                    sampleTerrainHeight(x + 3, z), sampleTerrainHeight(x - 3, z),
+                    sampleTerrainHeight(x, z + 3), sampleTerrainHeight(x, z - 3)
+                ];
+                const slope = Math.max(...neighborHeights.map((height) => Math.abs(height - y)));
+                if (slope > 2.5) continue;
+                const distance = Math.hypot(dx, dz);
+                const score = distance + slope * 7 + Math.abs(rawValue - 0.34) * 18;
+                if (score < bestScore) {
+                    best = { x, y, z };
+                    bestScore = score;
+                }
+            }
+        }
+        if (best) break;
+    }
+    return best || { x: centerX, y: sampleTerrainHeight(centerX, centerZ), z: centerZ };
+}
+let wreckPosition = findBeachWreckPosition();
+let wreckGroundY = wreckPosition.y;
+let wreckRawValue = CONTINENT.getValue(wreckPosition.x - terrainOffsetX, wreckPosition.z - terrainOffsetZ, 0);
+const wreckObject = await wreckSpawner.spawnRandomObject({ ...wreckPosition, y: -11 }, wreckRawValue, 0);
+if (wreckObject) {
+    wreckObject.name = 'Ship Wreck [Objective]';
+    wreckObject.transform.position.set(wreckPosition.x, wreckGroundY, wreckPosition.z);
+    wreckObject.transform.scale.set(1.8, 1.8, 1.8);
+    wreckObject.repaired = false;
+}
+camera.transform.position.set(wreckPosition.x + 7, wreckGroundY + 2, wreckPosition.z);
+const storyFlow = new StoryFlow({
+    camera,
+    controller: cameraController,
+    wreck: wreckObject,
+    enemies: () => enemies,
+    resources: resourceTracker,
+    required: shipRepairCost
+});
+game.story = storyFlow;
+game.shipRepairCost = shipRepairCost;
+document.getElementById('win-restart-btn')?.addEventListener('click', () => window.location.reload());
+
+// ── Audio hooks ──────────────────────────────────────────────────────────
+// Sword: fire sound at the start of every sword swing
+const _origAttackSelected = playerInventory.attackSelected.bind(playerInventory);
+playerInventory.attackSelected = function(onHit) {
+    const started = _origAttackSelected(onHit);
+    if (started) audio.playSword();
+    return started;
+};
+
+// Eating: fire sound when food consumption begins
+const _origStartEating = playerInventory.startEating.bind(playerInventory);
+playerInventory.startEating = function() {
+    const started = _origStartEating();
+    if (started) audio.playEat();
+    return started;
+};
+// ─────────────────────────────────────────────────────────────────────────
 
 // #endregion
 
@@ -677,20 +994,6 @@ window.addEventListener('keydown', (e) => {
             game.respawnWithSeed(randomSeed);
         }
 
-        // If editor WorldWindow is available, update its displayed seed
-        try {
-            if (game.editor && game.editor.windows && game.editor.windows.world) {
-                const ww = game.editor.windows.world;
-                if (ww && ww.state) {
-                    ww.state.seed = randomSeed;
-                    if (ww.seedController && typeof ww.seedController.updateDisplay === 'function') {
-                        ww.seedController.updateDisplay();
-                    }
-                }
-            }
-        } catch (err) {
-            console.warn('Failed to update WorldWindow seed UI', err);
-        }
     }
 });
 
@@ -717,16 +1020,61 @@ function loop(now) {
     Time.update(now);
     game.deltaTime = Time.deltaTime;
 
-    cameraController.update(Time.deltaTime);
+    if (storyFlow.phase === 'gameplay' || storyFlow.phase === 'repairing') {
+        cameraController.update(Time.deltaTime);
+    } else if (storyFlow.phase === 'intro' || storyFlow.phase === 'sailing') {
+        cameraController.keys.clear();
+    }
+    storyFlow.update(Time.deltaTime);
+    firstPersonHand.update(Time.deltaTime);
+    playerInventory.update(Time.deltaTime);
+    chestSpawner.update(Time.deltaTime);
+    audio.update(cameraController.isWalking);
 
-    
+    // ── Enemy update loop ────────────────────────────────────────────────
+    if ((storyFlow.phase === 'gameplay' || storyFlow.phase === 'repairing') && enemies.length > 0) {
+        const playerPos = camera.transform.position;
+        const enemyContext = {
+            playerPosition: playerPos,
+            allEnemies: enemies,
+            playerHealth,
+            collisionWorld,
+            camera,
+            drops
+        };
+        for (let i = 0; i < enemies.length; i++) {
+            enemies[i].update(Time.deltaTime, enemyContext);
+        }
+    }
+
+    // ── Drop update loop ─────────────────────────────────────────────────
+    if ((storyFlow.phase === 'gameplay' || storyFlow.phase === 'repairing') && drops.length > 0) {
+        const playerPos = camera.transform.position;
+        for (let i = drops.length - 1; i >= 0; i--) {
+            const done = drops[i].update(Time.deltaTime, playerPos, camera, resourceTracker);
+            if (done) drops.splice(i, 1);
+        }
+    }
+    // ────────────────────────────────────────────────────────────────────
+
+
     // Update material uniforms with time
-    matWater.setUniforms({ 'uTime': Time.time });
-    matBuoyancy.setUniforms({ 'uTime': Time.time });
-    matTreeWave.setUniforms({ 'uTime': Time.time });
-    matGrassWave.setUniforms({ 'uTime': Time.time });
-    matSkybox.setUniforms({ 'uTime': Time.time });
-    
+    matWater.setUniforms({
+        'uTime': Time.time
+    });
+    matBuoyancy.setUniforms({
+        'uTime': Time.time
+    });
+    matTreeWave.setUniforms({
+        'uTime': Time.time
+    });
+    matGrassWave.setUniforms({
+        'uTime': Time.time
+    });
+    matSkybox.setUniforms({
+        'uTime': Time.time
+    });
+
     // Update light direction
     if (matLighting.uniforms['uLightDir'] && matLighting.uniforms['uLightDir'].value) {
         const v = matLighting.uniforms['uLightDir'].value;
@@ -739,9 +1087,9 @@ function loop(now) {
             lightDir[0] = v[0];
             lightDir[1] = v[1];
             lightDir[2] = v[2];
-            
+
         }
-        lightingPass.lightDir = new Vector3(lightDir[0], lightDir[1], lightDir[2] );
+        lightingPass.lightDir = new Vector3(lightDir[0], lightDir[1], lightDir[2]);
     }
 
     camera.updateView();
@@ -750,14 +1098,14 @@ function loop(now) {
 
 
     gl.bindBuffer(gl.UNIFORM_BUFFER, ubo);
-    gl.bufferSubData(gl.UNIFORM_BUFFER, 0,   new Float32Array(camera.projectionMatrix));
-    gl.bufferSubData(gl.UNIFORM_BUFFER, 64,  new Float32Array(camera.viewMatrix));
+    gl.bufferSubData(gl.UNIFORM_BUFFER, 0, new Float32Array(camera.projectionMatrix));
+    gl.bufferSubData(gl.UNIFORM_BUFFER, 64, new Float32Array(camera.viewMatrix));
     gl.bufferSubData(gl.UNIFORM_BUFFER, 128, new Float32Array([camera.transform.position.x, camera.transform.position.y, camera.transform.position.z]));
 
     // Update skybox lighting
     if (matSkybox.uniforms['uSunColor']) {
-        skyboxPass.setLight(lightDir, 
-            matSkybox.uniforms['uSunColor'].value, 
+        skyboxPass.setLight(lightDir,
+            matSkybox.uniforms['uSunColor'].value,
             matSkybox.uniforms['uTopColor'].value,
             matSkybox.uniforms['uMidColor'].value,
             matSkybox.uniforms['uBottomColor'].value
@@ -766,14 +1114,14 @@ function loop(now) {
 
     renderQueue.execute(renderer, scene, camera);
     gl.flush()
-    gl.finish() 
+    gl.finish()
     // Update HUD with performance metrics
     const hud = document.getElementById('hud');
     if (hud) {
         hudUpdateCounter++;
         if (hudUpdateCounter >= 6) {
             hudUpdateCounter = 0;
-            
+
             const fpsValue = Time.unscaledDeltaTime > 0 ? Math.round(1.0 / Time.unscaledDeltaTime) : 0;
             const fps = fpsValue.toString().padStart(3, '0');
 
@@ -801,4 +1149,3 @@ function loop(now) {
 // #endregion
 
 requestAnimationFrame(loop);
-
