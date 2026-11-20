@@ -1,34 +1,34 @@
 {
-  "name": "pigl-js",
-  "version": "1.0.2",
-  "description": "A lightweight, shader-driven WebGL engine",
-  "homepage": "https://itstanpi.github.io/PiGL.js/",
-  "scripts": {
-    "dev": "vite --host",
-    "build": "vite build",
-    "preview": "vite preview",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist",
-    "build:lib": "set BUILD_LIB=1&& vite build --emptyOutDir"
-  },
-  "devDependencies": {
-    "gh-pages": "^6.3.0",
-    "vite": "^5.0.0"
-  },
-  "dependencies": {
-    "lil-gui": "^0.21.0"
-  },
-  "files": [
-    "dist/pigl.mjs",
-    "dist/pigl.umd.js",
-    "README.md"
-  ],
-  "main": "./dist/pigl.umd.js",
-  "module": "./dist/pigl.mjs",
-  "exports": {
-    ".": {
-      "import": "./dist/pigl.mjs",
-      "require": "./dist/pigl.umd.js"
+    "name": "pigl-js",
+    "version": "1.0.2",
+    "description": "A lightweight, shader-driven WebGL engine",
+    "homepage": "https://shaneisraeln.github.io/CodexGameJam/",
+    "scripts": {
+        "dev": "vite --host",
+        "build": "vite build",
+        "preview": "vite preview",
+        "predeploy": "npm run build",
+        "deploy": "gh-pages -d dist -b WorldGen",
+        "build:lib": "set BUILD_LIB=1&& vite build --emptyOutDir"
+    },
+    "devDependencies": {
+        "gh-pages": "^6.3.0",
+        "vite": "^5.0.0"
+    },
+    "dependencies": {
+        "lil-gui": "^0.21.0"
+    },
+    "files": [
+        "dist/pigl.mjs",
+        "dist/pigl.umd.js",
+        "README.md"
+    ],
+    "main": "./dist/pigl.umd.js",
+    "module": "./dist/pigl.mjs",
+    "exports": {
+        ".": {
+            "import": "./dist/pigl.mjs",
+            "require": "./dist/pigl.umd.js"
+        }
     }
-  }
 }
