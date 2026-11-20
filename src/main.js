@@ -21,6 +21,7 @@ import { ProfilerInstrumenter } from './Engine/Profiling/Profiler.js';
 import { Editor } from './Editor/Editor.js';
 import { FirstPersonController } from './FirstPersonController.js';
 import { FirstPersonHand } from './FirstPersonHand.js';
+import { PlayerInventory } from './PlayerInventory.js';
 import { FloatingObjectSpawner } from './FloatingObjectSpawner.js';
 
 
@@ -617,30 +618,6 @@ const game = {
     }
 };
 
-const playerHealth = new Health(100);
-game.player = {
-    name: 'Player',
-    health: playerHealth,
-    takeDamage: (amount, source = null) => playerHealth.takeDamage(amount, source),
-    heal: (amount, source = null) => playerHealth.heal(amount, source)
-};
-
-const healthTrack = document.querySelector('.health-track');
-const healthFill = document.getElementById('health-fill');
-const healthValue = document.getElementById('health-value');
-function updatePlayerHealthBar() {
-    const fraction = playerHealth.fraction;
-    const percent = Math.round(fraction * 100);
-    healthFill.style.width = `${percent}%`;
-    healthFill.classList.toggle('is-warning', fraction <= 0.6 && fraction > 0.3);
-    healthFill.classList.toggle('is-critical', fraction <= 0.3);
-    healthValue.textContent = `${Math.ceil(playerHealth.currentHealth)} / ${Math.ceil(playerHealth.maxHealth)}`;
-    healthTrack.setAttribute('aria-valuemax', String(playerHealth.maxHealth));
-    healthTrack.setAttribute('aria-valuenow', String(playerHealth.currentHealth));
-}
-playerHealth.onChange(updatePlayerHealthBar);
-updatePlayerHealthBar();
-
 // #endregion
 
 // #region Game API
@@ -648,9 +625,6 @@ updatePlayerHealthBar();
 game.setViewports = (mode) => {
     viewports[0].pass = mode;
 };
-game.damagePlayer = (amount, source = null) => playerHealth.takeDamage(amount, source);
-game.healPlayer = (amount, source = null) => playerHealth.heal(amount, source);
-
 // Floating object spawner control
 game.spawnFloatingObjects = async (count) => {
     const spawned = await floatingSpawner.spawnMany(
@@ -733,6 +707,14 @@ const playerHealth = new PlayerHealth({
 });
 
 game.playerHealth = playerHealth;
+game.player = {
+    name: 'Player',
+    health: playerHealth,
+    takeDamage: (amount) => playerHealth.takeDamage(amount),
+    heal: (amount) => playerHealth.heal(amount)
+};
+game.damagePlayer = (amount) => playerHealth.takeDamage(amount);
+game.healPlayer = (amount) => playerHealth.heal(amount);
 
 // #endregion
 
