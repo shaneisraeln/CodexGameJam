@@ -419,6 +419,13 @@ const size = 30.0;
 
 // #region Scene Objects Loading
 
+const initialWorldSeed = Math.floor(Math.random() * 0x100000000);
+const initialSeedRandom = mulberry32(initialWorldSeed);
+const initialOffsetRange = 32000;
+CONTINENT.setOffsets(
+    (initialSeedRandom() - 0.5) * initialOffsetRange,
+    (initialSeedRandom() - 0.5) * initialOffsetRange
+);
 
 let Terrain = new GameObject(renderer, planeTer, new HexGridMesh(gl, 255, 255, 1.0, true), 'Scense');
 Terrain.transform.position.set(-(255 * Math.sqrt(3) / 2), -11, -(255 * 1.5 / 2));
@@ -441,7 +448,7 @@ scene.push(Terrain);
 const floatingSpawner = new FloatingObjectSpawner(gl, renderer, matBuoyancy, scene);
 const chestSpawner = new ChestSpawner(gl, renderer, matScene, scene, null, {
     camera,
-    seed: 68,
+    seed: initialWorldSeed ^ 0x51F15E,
     lootTable: [{
         item: 'food',
         probability: 1,
@@ -468,7 +475,7 @@ const oceanConfig = {
 const floatingSpawnConfig = {
     enabled: true,
     count: 10,
-    seed: 68,
+    seed: initialWorldSeed,
     bounds: {
         minX: -(255 * Math.sqrt(3) / 2),
         maxX: (255 * Math.sqrt(3) / 2),
@@ -477,7 +484,7 @@ const floatingSpawnConfig = {
     },
     yFixed: -6.25
 };
-const shipRepairCost = { total: 4 };
+const shipRepairCost = { total: 12 };
 
 const grassBatchSpawner = new GrassBatchSpawner(gl, renderer, matGrassWave, scene, {
     density: 0.03,
@@ -761,10 +768,23 @@ const deathScreen = new DeathScreen({
         // Respawn enemies fresh
         enemySpawner.clearAll();
         enemies.length = 0;
-        storyFlow.restart();
+        wreckPosition = findBeachWreckPosition();
+        wreckGroundY = wreckPosition.y;
+        wreckRawValue = CONTINENT.getValue(wreckPosition.x - terrainOffsetX, wreckPosition.z - terrainOffsetZ, 0);
         wreckObject?.transform.position.set(wreckPosition.x, wreckGroundY, wreckPosition.z);
+        if (wreckObject?.collider) {
+            const oldCollider = wreckObject.collider;
+            collisionWorld.remove(oldCollider);
+            const colliderIndex = wreckSpawner.colliderHandles.indexOf(oldCollider);
+            wreckObject.collider = collisionWorld.addStaticObject(wreckObject, { radiusScale: 1 });
+            if (colliderIndex >= 0) wreckSpawner.colliderHandles[colliderIndex] = wreckObject.collider;
+        }
+        camera.transform.position.set(wreckPosition.x + 7, wreckGroundY + 2, wreckPosition.z);
+        cameraController.placeOnNearestLand();
+        storyFlow.shipBase = [wreckPosition.x, wreckGroundY, wreckPosition.z];
+        storyFlow.restart();
         enemySpawner.setSeed(seed ^ 0xDEAD);
-        enemySpawner.spawnGroups(1, floatingSpawnConfig.bounds).then(spawned => {
+        enemySpawner.spawnGroups(3, floatingSpawnConfig.bounds, 5).then(spawned => {
             for (let i = 0; i < spawned.length; i++) enemies.push(spawned[i]);
             game.enemies = enemies;
         });
@@ -807,15 +827,7 @@ game.healPlayer = (amount) => playerHealth.heal(amount);
 const enemySpawner = new EnemySpawner(gl, renderer, matScene, scene, {
     seed: floatingSpawnConfig.seed,
     minNoiseValue: 0.42,
-    collisionWorld,
-    enemyDefaults: {
-        maxHp: 50,
-        damage: 10,
-        moveSpeed: 3.2,
-        chaseSpeed: 4.5,
-        detectionRange: 80,
-        attackRange: 1.8
-    }
+    collisionWorld
 });
 
 let enemies = [];
@@ -823,7 +835,7 @@ let enemies = [];
 // Active loot drops — ticked every frame, spliced out when collected/expired
 const drops = [];
 
-enemySpawner.spawnGroups(1, floatingSpawnConfig.bounds).then(spawned => {
+enemySpawner.spawnGroups(3, floatingSpawnConfig.bounds, 5).then(spawned => {
     enemies = spawned;
     game.enemies = enemies; // keep game object in sync
     console.log(`[Enemies] Spawned ${spawned.length} enemies for the escape story.`);
@@ -889,20 +901,53 @@ const wreckSpawner = new LandObjectSpawner(gl, renderer, matScene, scene, ['ship
     threshold: 0.45,
     collisionWorld
 });
-const wreckPosition = { x: -46.5, y: -11, z: -47 };
-const wreckRawValue = CONTINENT.getValue(
-    wreckPosition.x - (-(255 * Math.sqrt(3) / 2)),
-    wreckPosition.z - (-(255 * 1.5 / 2)),
-    0
-);
-const wreckGroundY = -11 + HexGridMesh.terrainValue(wreckRawValue) * 20 * 0.4;
-const wreckObject = await wreckSpawner.spawnRandomObject(wreckPosition, wreckRawValue, 0);
+const terrainOffsetX = -(255 * Math.sqrt(3) / 2);
+const terrainOffsetZ = -(255 * 1.5 / 2);
+function sampleTerrainHeight(x, z) {
+    const rawValue = CONTINENT.getValue(x - terrainOffsetX, z - terrainOffsetZ, 0);
+    return -11 + HexGridMesh.terrainValue(rawValue) * 20 * 0.4;
+}
+function findBeachWreckPosition(centerX = -39.2, centerZ = -47) {
+    let best = null;
+    let bestScore = Infinity;
+    for (let radius = 0; radius <= 120; radius += 12) {
+        for (let dz = -radius; dz <= radius; dz += 3) {
+            for (let dx = -radius; dx <= radius; dx += 3) {
+                if (radius > 0 && Math.max(Math.abs(dx), Math.abs(dz)) !== radius) continue;
+                const x = centerX + dx;
+                const z = centerZ + dz;
+                const rawValue = CONTINENT.getValue(x - terrainOffsetX, z - terrainOffsetZ, 0);
+                if (rawValue <= 0.3) continue;
+                const y = sampleTerrainHeight(x, z);
+                const neighborHeights = [
+                    sampleTerrainHeight(x + 3, z), sampleTerrainHeight(x - 3, z),
+                    sampleTerrainHeight(x, z + 3), sampleTerrainHeight(x, z - 3)
+                ];
+                const slope = Math.max(...neighborHeights.map((height) => Math.abs(height - y)));
+                if (slope > 2.5) continue;
+                const distance = Math.hypot(dx, dz);
+                const score = distance + slope * 7 + Math.abs(rawValue - 0.34) * 18;
+                if (score < bestScore) {
+                    best = { x, y, z };
+                    bestScore = score;
+                }
+            }
+        }
+        if (best) break;
+    }
+    return best || { x: centerX, y: sampleTerrainHeight(centerX, centerZ), z: centerZ };
+}
+let wreckPosition = findBeachWreckPosition();
+let wreckGroundY = wreckPosition.y;
+let wreckRawValue = CONTINENT.getValue(wreckPosition.x - terrainOffsetX, wreckPosition.z - terrainOffsetZ, 0);
+const wreckObject = await wreckSpawner.spawnRandomObject({ ...wreckPosition, y: -11 }, wreckRawValue, 0);
 if (wreckObject) {
     wreckObject.name = 'Ship Wreck [Objective]';
     wreckObject.transform.position.set(wreckPosition.x, wreckGroundY, wreckPosition.z);
     wreckObject.transform.scale.set(1.8, 1.8, 1.8);
     wreckObject.repaired = false;
 }
+camera.transform.position.set(wreckPosition.x + 7, wreckGroundY + 2, wreckPosition.z);
 const storyFlow = new StoryFlow({
     camera,
     controller: cameraController,

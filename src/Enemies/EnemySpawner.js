@@ -135,7 +135,7 @@ export class EnemySpawner {
      * @param {{ minX, maxX, minZ, maxZ }} bounds
      * @returns {Promise<Enemy[]>}
      */
-    async spawnGroups(groupCount, bounds) {
+    async spawnGroups(groupCount, bounds, fixedGroupSize) {
         var mesh = await this._loadMesh();
         if (!mesh) {
             console.error('[EnemySpawner] Cannot spawn — mesh failed to load.');
@@ -152,7 +152,9 @@ export class EnemySpawner {
                 continue;
             }
 
-            var groupSize = GROUP_MIN_SIZE + Math.floor(this._rand() * (GROUP_MAX_SIZE - GROUP_MIN_SIZE + 1));
+            var groupSize = Number.isInteger(fixedGroupSize) && fixedGroupSize > 0
+                ? fixedGroupSize
+                : GROUP_MIN_SIZE + Math.floor(this._rand() * (GROUP_MAX_SIZE - GROUP_MIN_SIZE + 1));
 
             for (var m = 0; m < groupSize; m++) {
                 // Scatter member around anchor

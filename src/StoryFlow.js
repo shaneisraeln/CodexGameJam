@@ -17,6 +17,7 @@ export class StoryFlow {
         this.cameraKeys = null;
         this.shipElapsed = 0;
         this.shipBase = null;
+        this.shotDuration = 8;
 
         this.overlay = document.getElementById('story-overlay');
         this.title = document.getElementById('story-title');
@@ -57,7 +58,7 @@ export class StoryFlow {
     update(dt) {
         if (this.phase === 'intro') {
             this.phaseTime += dt;
-            const segment = Math.floor(this.phaseTime / 5.5);
+            const segment = Math.floor(this.phaseTime / this.shotDuration);
             if (segment === 1 && this._lastSegment !== 1) {
                 this._lastSegment = 1;
                 this._setCard('SURVIVE & ESCAPE', 'Explore the island and find a way to make it home.', true);
@@ -95,19 +96,20 @@ export class StoryFlow {
         const t = this.phaseTime;
         const p = this.camera.transform.position;
         const r = this.camera.transform.rotation;
-        if (t < 5.5) {
-            const q = Math.min(t / 5.5, 1);
+        if (t < this.shotDuration) {
+            const q = Math.min(t / this.shotDuration, 1);
             const smooth = q * q * (3 - 2 * q);
-            const startHeight = 28;
-            const endHeight = 9;
-            p.set(this.wreck.transform.position.x + 14 - smooth * 7,
+            const startHeight = 42;
+            const endHeight = 23;
+            p.set(this.wreck.transform.position.x + 34 - smooth * 15,
                 this.wreck.transform.position.y + startHeight + (endHeight - startHeight) * smooth,
-                this.wreck.transform.position.z + 20 - smooth * 9);
+                this.wreck.transform.position.z + 42 - smooth * 18);
             const aimX = this.wreck.transform.position.x - p.x;
             const aimZ = this.wreck.transform.position.z - p.z;
-            r.set(-0.15 - smooth * 0.25, Math.atan2(-aimX, -aimZ), 0);
-        } else if (t < 11) {
-            const q = Math.min((t - 5.5) / 5.5, 1);
+            const aimY = this.wreck.transform.position.y + 1.5 - p.y;
+            r.set(Math.atan2(aimY, Math.hypot(aimX, aimZ)), Math.atan2(-aimX, -aimZ), 0);
+        } else if (t < this.shotDuration * 2) {
+            const q = Math.min((t - this.shotDuration) / this.shotDuration, 1);
             const smooth = q * q * (3 - 2 * q);
             const south = { x: 0, z: 145 };
             const north = { x: 0, z: -145 };
@@ -125,7 +127,7 @@ export class StoryFlow {
                 targetX = north.x + (east.x - north.x) * blend;
                 targetZ = north.z + (east.z - north.z) * blend;
             }
-            const radius = 105 - smooth * 24;
+            const radius = 175 - smooth * 35;
             const orbit = q * Math.PI * 0.75;
             p.set(targetX + Math.sin(orbit) * radius,
                 58 + Math.sin(q * Math.PI) * 10,
@@ -137,16 +139,20 @@ export class StoryFlow {
             const enemyList = typeof this.enemies === 'function' ? this.enemies() : this.enemies;
             const enemy = enemyList.find((item) => item && item.active && !item.isDead);
             if (!enemy) return;
-            const q = Math.min((t - 11) / 5.5, 1);
-            const dx = enemy.transform.position.x - p.x;
-            const dz = enemy.transform.position.z - p.z;
-            const radius = 15 - q * 7;
-            p.set(enemy.transform.position.x + Math.sin(q * 1.2) * radius,
-                enemy.transform.position.y + 7 + q * 2,
-                enemy.transform.position.z + Math.cos(q * 1.2) * radius);
-            const aimX = enemy.transform.position.x - p.x;
-            const aimZ = enemy.transform.position.z - p.z;
-            r.set(-0.18 - q * 0.08, Math.atan2(-aimX, -aimZ), 0);
+            const q = Math.min((t - this.shotDuration * 2) / this.shotDuration, 1);
+            const smooth = q * q * (3 - 2 * q);
+            const targetX = enemy.transform.position.x;
+            const targetY = enemy.transform.position.y + 3.3;
+            const targetZ = enemy.transform.position.z;
+            const angle = 0.7 + smooth * 0.8;
+            const radius = 22 - smooth * 5;
+            p.set(targetX + Math.sin(angle) * radius,
+                targetY + 8 - smooth * 1.5,
+                targetZ + Math.cos(angle) * radius);
+            const aimX = targetX - p.x;
+            const aimY = targetY - p.y;
+            const aimZ = targetZ - p.z;
+            r.set(Math.atan2(aimY, Math.hypot(aimX, aimZ)), Math.atan2(-aimX, -aimZ), 0);
         }
     }
 
