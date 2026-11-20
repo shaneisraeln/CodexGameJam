@@ -1,16 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PiGL.js</title>
     <link rel="stylesheet" href="/src/style.css">
 </head>
+
 <body>
     <canvas id="glcanvas"></canvas>
     <script type="module" src="/src/main.js"></script>
     <div id="hud">FPS: --<br>Δ: -- ms</div>
     <div id="wip">Working in Progress</div>
 
+    <!-- Health Bar HUD -->
+    <div id="health-bar-root">
+        <div id="health-bar-icon">❤</div>
+        <div id="health-bar-track">
+            <div id="health-bar-fill"></div>
+            <div id="health-bar-segments"></div>
+        </div>
+        <span id="health-bar-label">100 / 100</span>
+    </div>
+
+    <!-- Full-screen damage flash overlay -->
+    <div id="damage-flash"></div>
+
 </body>
+
 </html>
