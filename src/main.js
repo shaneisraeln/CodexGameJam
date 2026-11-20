@@ -19,6 +19,7 @@ import { WireframePass } from './Engine/Rendering/Passes/WireframePass.js';
 import { ProfilerInstrumenter } from './Engine/Profiling/Profiler.js';
 import { Editor } from './Editor/Editor.js';
 import { FirstPersonController } from './FirstPersonController.js';
+import { FirstPersonHand } from './FirstPersonHand.js';
 import { FloatingObjectSpawner } from './FloatingObjectSpawner.js';
 
 
@@ -660,6 +661,10 @@ window.floatingSpawnConfig = floatingSpawnConfig;
 
 const cameraController = new FirstPersonController(camera, canvas);
 game.cameraController = cameraController;
+const firstPersonHand = new FirstPersonHand(gl, renderer, shaderMain, camera, scene, {
+    controller: cameraController
+});
+game.firstPersonHand = firstPersonHand;
 
 // #endregion
 
@@ -718,6 +723,7 @@ function loop(now) {
     game.deltaTime = Time.deltaTime;
 
     cameraController.update(Time.deltaTime);
+    firstPersonHand.update(Time.deltaTime);
 
     
     // Update material uniforms with time

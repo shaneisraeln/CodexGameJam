@@ -41,6 +41,7 @@ export class FirstPersonController {
         this.yaw = camera.transform.rotation.y;
         this.verticalVelocity = 0;
         this.grounded = false;
+        this.isWalking = false;
         this.bobTime = 0;
         this.bobOffsetY = 0;
         this.bobOffsetX = 0;
@@ -197,6 +198,7 @@ export class FirstPersonController {
         }
 
         const walking = moved && this.grounded;
+        this.isWalking = walking;
         if (walking && this.settings.bobbingEnabled) {
             const sprintFactor = this.keys.has('shift') ? this.settings.sprintMultiplier : 1;
             this.bobTime += frameTime * this.settings.bobFrequency * sprintFactor;
