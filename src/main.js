@@ -22,7 +22,6 @@ import { Editor } from './Editor/Editor.js';
 import { FirstPersonController } from './FirstPersonController.js';
 import { FirstPersonHand } from './FirstPersonHand.js';
 import { PlayerInventory } from './PlayerInventory.js';
-import { ChestSpawner } from './ChestSpawner.js';
 import { FloatingObjectSpawner } from './FloatingObjectSpawner.js';
 
 
@@ -55,6 +54,9 @@ import {
 import {
     EnemySpawner
 } from './Enemies/EnemySpawner.js';
+import {
+    Poof
+} from './Enemies/Poof.js';
 
 // #endregion
 
@@ -771,10 +773,29 @@ game.cameraController = cameraController;
 const firstPersonHand = new FirstPersonHand(gl, renderer, shaderMain, camera, scene, {
     controller: cameraController,
     inputElement: canvas,
-    onEatFood: (healAmount) => game.healPlayer(healAmount)
+    onEatFood: (healAmount) => game.healPlayer(healAmount),
+    attackDamage: 25,
+    attackReach: 3.2,
+    attackRadius: 0.9
 });
 game.firstPersonHand = firstPersonHand;
 game.attack = () => firstPersonHand.attack();
+
+// ── Patch applyDamage so enemies receive fromPos + camera for knockback/poof ──
+const _origApplyDamage = firstPersonHand.applyDamage.bind(firstPersonHand);
+firstPersonHand.applyDamage = function(target, amount) {
+    if (amount === undefined) amount = firstPersonHand.settings.attackDamage;
+    // Enemy.takeDamage(amount, fromPos, camera)
+    if (target && typeof target.takeDamage === 'function' && target.hitRadius !== undefined) {
+        const result = target.takeDamage(amount, camera.transform.position, camera);
+        // Spawn hit spark if the enemy survived (poof handles death separately)
+        if (result > 0 && !target.isDead) {
+            Poof.spawnHit(target.transform.position, camera);
+        }
+        return typeof result === 'number' ? result : amount;
+    }
+    return _origApplyDamage(target, amount);
+};
 const playerInventory = new PlayerInventory(gl, renderer, shaderMain, camera, scene, {
     hand: firstPersonHand,
     controller: cameraController
@@ -852,7 +873,8 @@ function loop(now) {
             playerPosition: playerPos,
             allEnemies: enemies,
             playerHealth,
-            collisionWorld
+            collisionWorld,
+            camera
         };
         for (let i = 0; i < enemies.length; i++) {
             enemies[i].update(Time.deltaTime, enemyContext);
